@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Generated media (runtime)
+backend/uploads/
+backend/generated/
+
+# Database (runtime)
+backend/*.db
+
+# Design system (generated)
+design-system/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Compiled Python
+.claude/skills/ui-ux-pro-max/scripts/__pycache__/
