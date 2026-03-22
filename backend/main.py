@@ -17,7 +17,6 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info("Britney API starting up...")
     init_db()
-    await _seed_demo_data()
     from services.scheduler import start_scheduler
     start_scheduler()
     yield
@@ -57,48 +56,6 @@ app.mount("/api/media", StaticFiles(directory=str(settings.generated_dir)), name
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "1.0.0"}
-
-
-async def _seed_demo_data():
-    """Seed PlantPal demo brand if not already present."""
-    import json
-    from database import SessionLocal
-    from models.brand import Brand
-    from schemas.brand import AutoPilotConfig
-
-    db = SessionLocal()
-    try:
-        existing = db.query(Brand).filter(Brand.name == "PlantPal").first()
-        if existing:
-            return
-
-        logger.info("Seeding PlantPal demo brand...")
-        dna = {
-            "colors": ["#10b981", "#34d399", "#065f46", "#f0fdf4", "#1a1a2e"],
-            "fonts": ["Plus Jakarta Sans", "Inter"],
-            "voice_tone": "friendly, educational, and nurturing. Like a knowledgeable friend who loves plants.",
-            "visual_style": "fresh, natural, clean. Lush greens, soft lighting, lifestyle photography. Plants in beautiful home settings.",
-            "keywords": ["plant care", "indoor plants", "plant parent", "houseplants", "green living", "biophilic design", "sustainability"],
-            "personality": "PlantPal is the caring companion every plant parent needs. We make plant care joyful, easy, and rewarding through the power of AI.",
-            "target_audience": "Millennials and Gen Z plant enthusiasts aged 22-38, interested in home decor, sustainability, and wellness.",
-            "unique_value_prop": "AI-powered plant identification and personalized care reminders that learn your plants' needs over time.",
-        }
-        brand = Brand(
-            name="PlantPal",
-            description="AI-powered plant care companion app. Identifies plants from photos, diagnoses diseases, sends smart watering and fertilizing reminders.",
-            niche="plant care & indoor gardening",
-            website_url="https://plantpal.app",
-            dna_json=json.dumps(dna),
-            autopilot_json=json.dumps(AutoPilotConfig().model_dump()),
-        )
-        db.add(brand)
-        db.commit()
-        logger.info(f"PlantPal seeded with id: {brand.id}")
-    except Exception as e:
-        logger.error(f"Seed failed: {e}")
-        db.rollback()
-    finally:
-        db.close()
 
 
 if __name__ == "__main__":

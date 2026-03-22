@@ -255,15 +255,15 @@ export default function RefinementChat({ post, onClose, onPostUpdate }: Refineme
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                 style={{
-                  background: msg.role === 'user' ? '#7c3aed' : '#1a1a2e',
+                  background: msg.role === 'user' ? '#27272a' : '#1c1c1f',
                   border: '1px solid',
-                  borderColor: msg.role === 'user' ? '#7c3aed' : '#2d2d3d',
+                  borderColor: msg.role === 'user' ? '#3f3f46' : '#27272a',
                 }}
               >
                 {msg.role === 'user' ? (
-                  <User size={12} style={{ color: '#fff' }} />
+                  <User size={12} style={{ color: '#a1a1aa' }} />
                 ) : (
-                  <Bot size={12} style={{ color: '#a855f7' }} />
+                  <Bot size={12} style={{ color: '#e879f9' }} />
                 )}
               </div>
 
@@ -271,8 +271,8 @@ export default function RefinementChat({ post, onClose, onPostUpdate }: Refineme
               <div
                 className="max-w-[85%] px-3 py-2 rounded-2xl text-xs leading-relaxed"
                 style={{
-                  background: msg.role === 'user' ? 'rgba(124,58,237,0.2)' : '#1a1a2e',
-                  border: `1px solid ${msg.role === 'user' ? 'rgba(124,58,237,0.4)' : '#2d2d3d'}`,
+                  background: msg.role === 'user' ? '#27272a' : '#1c1c1f',
+                  border: `1px solid ${msg.role === 'user' ? '#3f3f46' : '#27272a'}`,
                   color: '#f8fafc',
                   borderTopRightRadius: msg.role === 'user' ? '4px' : undefined,
                   borderTopLeftRadius: msg.role === 'assistant' ? '4px' : undefined,
@@ -293,7 +293,7 @@ export default function RefinementChat({ post, onClose, onPostUpdate }: Refineme
       {/* Input */}
       <div
         className="flex-shrink-0 p-3"
-        style={{ borderTop: '1px solid #2d2d3d' }}
+        style={{ borderTop: '1px solid #27272a' }}
       >
         <div className="flex gap-2 items-center">
           <input
@@ -305,18 +305,18 @@ export default function RefinementChat({ post, onClose, onPostUpdate }: Refineme
             disabled={isStreaming}
             className="flex-1 px-3 py-2 rounded-xl text-xs outline-none transition-all duration-200 disabled:opacity-50"
             style={{
-              background: '#1a1a2e',
-              border: '1px solid #2d2d3d',
-              color: '#f8fafc',
+              background: '#1c1c1f',
+              border: '1px solid #27272a',
+              color: '#f4f4f5',
             }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = '#7c3aed')}
-            onBlur={(e) => (e.currentTarget.style.borderColor = '#2d2d3d')}
+            onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(250,250,250,0.2)')}
+            onBlur={(e) => (e.currentTarget.style.borderColor = '#27272a')}
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || isStreaming}
             className="p-2 rounded-xl cursor-pointer transition-all duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-            style={{ background: '#7c3aed', color: '#fff' }}
+            style={{ background: '#fafafa', color: '#09090b' }}
           >
             {isStreaming ? (
               <Loader2 size={14} className="animate-spin" />

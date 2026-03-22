@@ -11,6 +11,7 @@ import {
   Loader2,
   LayoutGrid,
   Send,
+  ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCampaignPosts, approveContent } from '../../../../lib/api'
@@ -84,8 +85,8 @@ export default function ReviewPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: '#7c3aed' }} />
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+        <Loader2 size={24} className="animate-spin text-zinc-400" />
       </div>
     )
   }
@@ -93,88 +94,105 @@ export default function ReviewPage({ params }: PageProps) {
   const campaignPlatforms = currentCampaign?.platforms ?? []
 
   return (
-    <div className="min-h-screen" style={{ background: '#0a0a0f' }}>
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-6"
-        >
+    <div className="min-h-screen bg-zinc-950">
+      {/* Header */}
+      <header className="border-b border-zinc-800 px-6 py-4 sticky top-0 bg-zinc-950 z-20">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href={`/campaign/${id}`}>
-              <button
-                className="p-2 rounded-xl cursor-pointer transition-all duration-150 hover:bg-white/5"
-                style={{ color: '#94a3b8' }}
-              >
-                <ArrowLeft size={18} />
+              <button className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all duration-150 cursor-pointer">
+                <ArrowLeft size={16} />
               </button>
             </Link>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: '#f8fafc' }}>
-                Content Review
-              </h1>
-              <p className="text-sm" style={{ color: '#94a3b8' }}>
-                {posts.length} post{posts.length !== 1 ? 's' : ''} generated
-              </p>
+
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 text-sm">
+              <Link href="/dashboard">
+                <span className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer">Dashboard</span>
+              </Link>
+              <ChevronRight size={12} className="text-zinc-700" />
+              <Link href={`/campaign/${id}`}>
+                <span className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer">Pipeline</span>
+              </Link>
+              <ChevronRight size={12} className="text-zinc-700" />
+              <span className="text-zinc-200 font-medium">Content Review</span>
             </div>
           </div>
 
           {/* Stats + action */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="flex items-center gap-1" style={{ color: '#10b981' }}>
-                <CheckCircle2 size={14} />
-                {approvedPosts.length}
-              </span>
-              <span style={{ color: '#2d2d3d' }}>|</span>
-              <span className="flex items-center gap-1" style={{ color: '#ef4444' }}>
-                <XCircle size={14} />
-                {rejectedPosts.length}
-              </span>
-              <span style={{ color: '#2d2d3d' }}>|</span>
-              <span className="flex items-center gap-1" style={{ color: '#94a3b8' }}>
-                <LayoutGrid size={14} />
-                {pendingPosts.length} pending
-              </span>
+          <div className="flex items-center gap-4">
+            {/* Stats */}
+            <div className="hidden sm:flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5 text-green-500">
+                <CheckCircle2 size={13} />
+                <span className="font-semibold">{approvedPosts.length}</span>
+                <span className="text-zinc-600">approved</span>
+              </div>
+              <div className="w-px h-3 bg-zinc-800" />
+              <div className="flex items-center gap-1.5 text-red-400">
+                <XCircle size={13} />
+                <span className="font-semibold">{rejectedPosts.length}</span>
+                <span className="text-zinc-600">rejected</span>
+              </div>
+              <div className="w-px h-3 bg-zinc-800" />
+              <div className="flex items-center gap-1.5 text-zinc-500">
+                <LayoutGrid size={13} />
+                <span className="font-semibold">{pendingPosts.length}</span>
+                <span className="text-zinc-600">pending</span>
+              </div>
             </div>
 
             {!showPublish && (
               <button
                 onClick={handleBulkApprove}
                 disabled={submitting || (approvedPosts.length === 0 && rejectedPosts.length === 0)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: '#10b981', color: '#000' }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                style={{ background: '#22c55e', color: '#fff' }}
               >
                 {submitting ? (
-                  <Loader2 size={14} className="animate-spin" />
+                  <Loader2 size={13} className="animate-spin" />
                 ) : (
-                  <Send size={14} />
+                  <Send size={13} />
                 )}
                 Save Decisions
               </button>
             )}
           </div>
-        </motion.div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        {/* Total count */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-xs text-zinc-500 mb-4"
+        >
+          {posts.length} post{posts.length !== 1 ? 's' : ''} generated
+        </motion.p>
 
         <div className="flex gap-6">
           {/* Posts grid */}
           <div className="flex-1 min-w-0">
             {posts.length === 0 ? (
               <div className="text-center py-20">
-                <p className="text-sm" style={{ color: '#475569' }}>
-                  No posts found for this campaign.
-                </p>
+                <p className="text-sm text-zinc-600">No posts found for this campaign.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {posts.map((post) => (
-                  <PostCard
+                {posts.map((post, i) => (
+                  <motion.div
                     key={post.id}
-                    post={post}
-                    onUpdate={handlePostUpdate}
-                    onRefine={setRefiningPost}
-                  />
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                  >
+                    <PostCard
+                      post={post}
+                      onUpdate={handlePostUpdate}
+                      onRefine={setRefiningPost}
+                    />
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -184,15 +202,15 @@ export default function ReviewPage({ params }: PageProps) {
           <AnimatePresence>
             {(refiningPost || showPublish) && (
               <motion.div
-                initial={{ opacity: 0, x: 40, width: 0 }}
-                animate={{ opacity: 1, x: 0, width: 360 }}
-                exit={{ opacity: 0, x: 40, width: 0 }}
-                transition={{ duration: 0.25 }}
+                initial={{ opacity: 0, x: 32 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 32 }}
+                transition={{ duration: 0.22 }}
                 className="flex-shrink-0"
                 style={{ width: 360 }}
               >
                 {refiningPost && (
-                  <div style={{ height: 'calc(100vh - 120px)', position: 'sticky', top: '24px' }}>
+                  <div style={{ height: 'calc(100vh - 88px)', position: 'sticky', top: '72px' }}>
                     <RefinementChat
                       post={refiningPost}
                       onClose={() => setRefiningPost(null)}
@@ -202,7 +220,7 @@ export default function ReviewPage({ params }: PageProps) {
                 )}
 
                 {!refiningPost && showPublish && (
-                  <div style={{ position: 'sticky', top: '24px' }}>
+                  <div style={{ position: 'sticky', top: '72px' }}>
                     <PublishPanel
                       postIds={approvedPosts.map((p) => p.id)}
                       availablePlatforms={campaignPlatforms}
@@ -213,19 +231,6 @@ export default function ReviewPage({ params }: PageProps) {
             )}
           </AnimatePresence>
         </div>
-
-        {/* Floating publish button when decisions saved and panel not shown */}
-        <AnimatePresence>
-          {showPublish && !refiningPost && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="fixed bottom-6 right-6 z-40"
-            >
-              {/* Panel is already shown as sticky side panel */}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   )

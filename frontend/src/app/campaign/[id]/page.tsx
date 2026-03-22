@@ -13,6 +13,8 @@ import {
   WifiOff,
   Loader2,
   FileCheck,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getCampaign, approveStrategy } from '../../../lib/api'
@@ -37,13 +39,14 @@ function StrategyReview({
   onApproved: () => void
 }) {
   const [loading, setLoading] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(null)
   const strategy = campaign.strategy as Record<string, unknown> | undefined
 
   const handleApprove = async () => {
     setLoading(true)
     try {
       await approveStrategy(campaign.id)
-      toast.success('Strategy approved! Generating content...')
+      toast.success('Strategy approved — generating content...')
       onApproved()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to approve strategy')
@@ -54,42 +57,67 @@ function StrategyReview({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl p-6 mt-6"
-      style={{ background: '#12121a', border: '1px solid #f59e0b40' }}
+      className="rounded-xl border bg-zinc-900 mt-6"
+      style={{ borderColor: 'rgba(245,158,11,0.3)' }}
     >
-      <div className="flex items-center gap-2 mb-4">
-        <AlertCircle size={18} style={{ color: '#f59e0b' }} />
-        <h3 className="text-base font-bold" style={{ color: '#f8fafc' }}>
-          Strategy Ready for Review
-        </h3>
+      <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
+        <div className="flex items-center gap-2">
+          <AlertCircle size={16} className="text-amber-500" />
+          <h3 className="text-sm font-semibold text-zinc-100">Strategy Ready for Review</h3>
+        </div>
+        <button
+          onClick={handleApprove}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          style={{ background: '#22c55e', color: '#fff' }}
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+          Approve Strategy
+        </button>
       </div>
 
       {strategy && (
-        <div className="space-y-3 mb-6">
-          {Object.entries(strategy).map(([key, value]) => (
-            <div key={key}>
-              <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: '#475569' }}>
-                {key.replace(/_/g, ' ')}
-              </p>
-              <p className="text-sm leading-relaxed" style={{ color: '#94a3b8' }}>
-                {typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
-              </p>
-            </div>
-          ))}
+        <div className="p-5 space-y-2">
+          {Object.entries(strategy).map(([key, value]) => {
+            const isExpanded = expanded === key
+            const preview =
+              typeof value === 'string'
+                ? value.slice(0, 120)
+                : JSON.stringify(value).slice(0, 120)
+            const full =
+              typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+            const isLong = full.length > 120
+
+            return (
+              <div
+                key={key}
+                className="rounded-lg border border-zinc-800 overflow-hidden"
+              >
+                <button
+                  onClick={() => setExpanded(isExpanded ? null : key)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-zinc-800/50 transition-colors duration-150 cursor-pointer"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    {key.replace(/_/g, ' ')}
+                  </span>
+                  {isLong && (
+                    isExpanded
+                      ? <ChevronDown size={14} className="text-zinc-600 flex-shrink-0" />
+                      : <ChevronRight size={14} className="text-zinc-600 flex-shrink-0" />
+                  )}
+                </button>
+                <div className="px-4 pb-3">
+                  <p className="text-sm text-zinc-400 leading-relaxed">
+                    {isExpanded || !isLong ? full : `${preview}...`}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
-
-      <button
-        onClick={handleApprove}
-        disabled={loading}
-        className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold cursor-pointer transition-all duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed glow-green"
-        style={{ background: '#10b981', color: '#fff' }}
-      >
-        {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-        Approve Strategy
-      </button>
     </motion.div>
   )
 }
@@ -99,31 +127,27 @@ function StrategyReview({
 function SuccessState({ campaignId }: { campaignId: string }) {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="text-center py-12"
+      className="text-center py-12 mt-6"
     >
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        transition={{ type: 'spring', damping: 15, delay: 0.2 }}
-        className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center glow-green"
-        style={{ background: 'rgba(16,185,129,0.2)', border: '2px solid #10b981' }}
+        transition={{ type: 'spring', damping: 14, delay: 0.15 }}
+        className="w-16 h-16 rounded-full mx-auto mb-5 flex items-center justify-center border-2 border-green-500"
+        style={{ background: 'rgba(34,197,94,0.12)' }}
       >
-        <CheckCircle2 size={36} style={{ color: '#10b981' }} />
+        <CheckCircle2 size={28} className="text-green-500" />
       </motion.div>
-      <h2 className="text-2xl font-bold mb-2" style={{ color: '#f8fafc' }}>
-        Campaign Complete!
-      </h2>
-      <p className="text-sm mb-6" style={{ color: '#94a3b8' }}>
-        All posts have been generated and processed.
-      </p>
+      <h2 className="text-xl font-700 text-zinc-50 mb-1">Campaign Complete</h2>
+      <p className="text-sm text-zinc-400 mb-6">All posts have been generated and processed.</p>
       <Link href={`/campaign/${campaignId}/review`}>
         <button
-          className="flex items-center gap-2 mx-auto px-6 py-3 rounded-xl font-semibold cursor-pointer transition-all duration-150 hover:opacity-90 glow-purple"
-          style={{ background: '#7c3aed', color: '#fff' }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 hover:opacity-90 cursor-pointer"
+          style={{ background: '#fafafa', color: '#09090b' }}
         >
-          <ExternalLink size={16} />
+          <ExternalLink size={14} />
           View All Posts
         </button>
       </Link>
@@ -154,7 +178,7 @@ export default function CampaignPage({ params }: PageProps) {
       .finally(() => setLoading(false))
   }, [id, setCampaign, router])
 
-  // Poll campaign status when awaiting review or running
+  // Poll campaign status when running
   useEffect(() => {
     if (!currentCampaign) return
     const needsPoll =
@@ -184,8 +208,8 @@ export default function CampaignPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
-        <Loader2 size={32} className="animate-spin" style={{ color: '#7c3aed' }} />
+      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+        <Loader2 size={24} className="animate-spin text-zinc-400" />
       </div>
     )
   }
@@ -193,45 +217,37 @@ export default function CampaignPage({ params }: PageProps) {
   const campaign = currentCampaign
 
   return (
-    <div className="min-h-screen p-6" style={{ background: '#0a0a0f' }}>
-      <div className="max-w-6xl mx-auto">
-        {/* Nav */}
-        <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
-        >
+    <div className="min-h-screen bg-zinc-950">
+      {/* Nav */}
+      <header className="border-b border-zinc-800 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/dashboard">
-              <button
-                className="p-2 rounded-xl cursor-pointer transition-all duration-150 hover:bg-white/5"
-                style={{ color: '#94a3b8' }}
-              >
-                <ArrowLeft size={18} />
+              <button className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all duration-150 cursor-pointer">
+                <ArrowLeft size={16} />
               </button>
             </Link>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: '#f8fafc' }}>
-                Campaign Pipeline
-              </h1>
-              {campaign && (
-                <p className="text-sm line-clamp-1 max-w-md" style={{ color: '#94a3b8' }}>
-                  {campaign.goal}
-                </p>
-              )}
+
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 text-sm">
+              <Link href="/dashboard">
+                <span className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer">Dashboard</span>
+              </Link>
+              <ChevronRight size={12} className="text-zinc-700" />
+              <span className="text-zinc-200 font-medium">Campaign Pipeline</span>
             </div>
           </div>
 
-          {/* SSE connection indicator */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* SSE indicator */}
             {isConnected ? (
-              <div className="flex items-center gap-1.5 text-xs" style={{ color: '#10b981' }}>
-                <Wifi size={14} />
+              <div className="flex items-center gap-1.5 text-xs text-green-500">
+                <Wifi size={12} />
                 <span>Live</span>
               </div>
             ) : sseError ? (
-              <div className="flex items-center gap-1.5 text-xs" style={{ color: '#94a3b8' }}>
-                <WifiOff size={14} />
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <WifiOff size={12} />
                 <span>Reconnecting</span>
               </div>
             ) : null}
@@ -239,7 +255,7 @@ export default function CampaignPage({ params }: PageProps) {
             {campaign?.status === 'awaiting_content_review' && (
               <Link href={`/campaign/${id}/review`}>
                 <button
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-150 hover:opacity-90"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 hover:opacity-90 cursor-pointer"
                   style={{ background: '#f59e0b', color: '#000' }}
                 >
                   <FileCheck size={14} />
@@ -251,8 +267,8 @@ export default function CampaignPage({ params }: PageProps) {
             {(campaign?.status === 'completed' || campaign?.status === 'content_approved') && (
               <Link href={`/campaign/${id}/review`}>
                 <button
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-150 hover:opacity-90"
-                  style={{ background: '#7c3aed', color: '#fff' }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 hover:opacity-90 cursor-pointer"
+                  style={{ background: '#fafafa', color: '#09090b' }}
                 >
                   <ExternalLink size={14} />
                   View Posts
@@ -260,18 +276,29 @@ export default function CampaignPage({ params }: PageProps) {
               </Link>
             )}
           </div>
-        </motion.div>
+        </div>
+      </header>
 
-        {/* Pipeline visualization */}
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        {/* Goal */}
+        {campaign && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold mb-1">Campaign Goal</p>
+            <p className="text-base text-zinc-200">{campaign.goal}</p>
+          </motion.div>
+        )}
+
+        {/* Pipeline */}
         <PipelineView />
 
-        {/* Strategy review section */}
+        {/* Strategy review */}
         <AnimatePresence>
           {campaign?.status === 'awaiting_strategy_review' && (
-            <StrategyReview
-              campaign={campaign}
-              onApproved={handleStrategyApproved}
-            />
+            <StrategyReview campaign={campaign} onApproved={handleStrategyApproved} />
           )}
         </AnimatePresence>
 
@@ -279,29 +306,27 @@ export default function CampaignPage({ params }: PageProps) {
         <AnimatePresence>
           {campaign?.status === 'awaiting_content_review' && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="rounded-2xl p-6 mt-6 flex items-center justify-between"
-              style={{ background: '#12121a', border: '1px solid #f59e0b40' }}
+              className="rounded-xl border bg-zinc-900 mt-6 flex items-center justify-between px-5 py-4"
+              style={{ borderColor: 'rgba(245,158,11,0.3)' }}
             >
               <div className="flex items-center gap-3">
-                <AlertCircle size={20} style={{ color: '#f59e0b' }} />
+                <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
                 <div>
-                  <p className="font-semibold" style={{ color: '#f8fafc' }}>
-                    Content is ready for your review
-                  </p>
-                  <p className="text-sm" style={{ color: '#94a3b8' }}>
-                    Approve, reject, or refine individual posts before publishing
+                  <p className="text-sm font-semibold text-zinc-100">Content is ready for review</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Approve, reject, or refine posts before publishing
                   </p>
                 </div>
               </div>
               <Link href={`/campaign/${id}/review`}>
                 <button
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold cursor-pointer transition-all duration-150 hover:opacity-90 flex-shrink-0"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 hover:opacity-90 cursor-pointer flex-shrink-0"
                   style={{ background: '#f59e0b', color: '#000' }}
                 >
-                  <FileCheck size={16} />
+                  <FileCheck size={14} />
                   Review Now
                 </button>
               </Link>
@@ -309,7 +334,7 @@ export default function CampaignPage({ params }: PageProps) {
           )}
         </AnimatePresence>
 
-        {/* Completed state */}
+        {/* Completed */}
         <AnimatePresence>
           {campaign?.status === 'completed' && <SuccessState campaignId={id} />}
         </AnimatePresence>

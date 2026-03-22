@@ -20,25 +20,15 @@ router = APIRouter(prefix="/api/brand", tags=["brand"])
 
 @router.post("")
 async def setup_brand(
-    name: str = Form(...),
-    description: str = Form(...),
-    niche: str = Form(...),
+    name: str = Form(""),
+    description: str = Form(""),
+    niche: str = Form(""),
     text_context: str = Form(""),
     website_url: str = Form(""),
     files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
 ):
     """Create a brand and extract Brand DNA from all provided context."""
-    brand = Brand(
-        id=str(uuid.uuid4()),
-        name=name,
-        description=description,
-        niche=niche,
-        website_url=website_url,
-    )
-    db.add(brand)
-    db.flush()
-
     context_parts = []
     image_base64s = []
 
@@ -54,6 +44,56 @@ async def setup_brand(
                 f"WEBSITE CONTENT ({scraped.get('title', website_url)}):\n"
                 f"{scraped['text'][:3000]}"
             )
+
+    # If name/description/niche are empty, extract from context using Gemini
+    if not name.strip() or not description.strip() or not niche.strip():
+        context_text = "\n\n".join(context_parts) if context_parts else text_context
+        if context_text.strip():
+            extract_prompt = f"""
+Analyze the following brand context and extract key brand information.
+
+Context:
+{context_text[:4000]}
+
+Return JSON with exactly these fields:
+{{
+  "name": "Brand name (infer from context or use a generic name if unclear)",
+  "description": "1-2 sentence brand description",
+  "niche": "Industry or niche (e.g. 'SaaS', 'Fashion', 'Food & Beverage')"
+}}
+
+Only return valid JSON, nothing else.
+"""
+            try:
+                extracted = await gemini.generate_json(extract_prompt)
+                if not name.strip():
+                    name = extracted.get("name", "My Brand")
+                if not description.strip():
+                    description = extracted.get("description", "")
+                if not niche.strip():
+                    niche = extracted.get("niche", "General")
+            except Exception as e:
+                logger.error(f"Brand info extraction failed: {e}")
+                if not name.strip():
+                    name = "My Brand"
+                if not niche.strip():
+                    niche = "General"
+        else:
+            if not name.strip():
+                name = "My Brand"
+            if not niche.strip():
+                niche = "General"
+
+    temp_id = str(uuid.uuid4())
+    brand = Brand(
+        id=temp_id,
+        name=name,
+        description=description,
+        niche=niche,
+        website_url=website_url,
+    )
+    db.add(brand)
+    db.flush()
 
     # Uploaded files
     for f in files:

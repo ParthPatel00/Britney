@@ -1,104 +1,376 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  ArrowRight,
-  ArrowLeft,
-  Upload,
-  Check,
-  Sparkles,
-  Globe,
-  FileText,
-  Zap,
-} from 'lucide-react'
+import { Paperclip, Send, X, Globe, Check, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getBrands, createBrand, createCampaign, startCampaign } from '../lib/api'
-import type { Platform } from '../lib/types'
+import type { Platform, Brand } from '../lib/types'
 
-// ─── Particle Background ──────────────────────────────────────────────────────
+// ─── Platform data ────────────────────────────────────────────────────────────
 
-// Pre-computed stable particles to avoid SSR hydration mismatch
-const PARTICLES = Array.from({ length: 40 }).map((_, i) => {
-  // Deterministic pseudo-random using index
-  const seed = (i * 2654435761) >>> 0
-  const size = 1 + (seed % 400) / 100
-  const left = (seed % 10000) / 100
-  const top = ((seed >> 8) % 10000) / 100
-  const duration = 15 + (seed % 2000) / 100
-  const delay = (seed % 1000) / 100
-  const color = i % 3 === 0 ? '#7c3aed' : i % 3 === 1 ? '#a855f7' : '#4f46e5'
-  return { id: i, size, color, left: `${left}%`, top: `${top}%`, duration, delay }
-})
+const PLATFORMS: { id: Platform; label: string; color: string }[] = [
+  { id: 'instagram', label: 'Instagram', color: '#e1306c' },
+  { id: 'twitter', label: 'X / Twitter', color: '#ffffff' },
+  { id: 'linkedin', label: 'LinkedIn', color: '#0a66c2' },
+  { id: 'facebook', label: 'Facebook', color: '#1877f2' },
+  { id: 'tiktok', label: 'TikTok', color: '#69c9d0' },
+  { id: 'youtube', label: 'YouTube', color: '#ff0000' },
+]
 
-function ParticleBackground() {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Phase =
+  | 'brand-input'
+  | 'brand-processing'
+  | 'brand-confirmed'
+  | 'campaign-goal'
+  | 'campaign-platforms'
+  | 'campaign-posts'
+  | 'campaign-creating'
+  | 'done'
+
+interface ChatMessage {
+  id: string
+  role: 'ai' | 'user' | 'card'
+  content?: string
+  card?: 'brand-dna' | 'platform-picker' | 'posts-picker' | 'loading'
+  brand?: Brand
+  platforms?: Platform[]
+  numPosts?: number
+}
+
+// ─── URL detection ────────────────────────────────────────────────────────────
+
+function detectUrl(text: string): string | null {
+  const match = text.match(/https?:\/\/[^\s]+/i)
+  return match ? match[0] : null
+}
+
+// ─── BrandDNA Block ───────────────────────────────────────────────────────────
+
+function BrandDNABlock({ brand }: { brand: Brand }) {
+  const dna = brand.brand_dna
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
-      {PARTICLES.map((p) => (
-        <div
-          key={p.id}
-          className="absolute rounded-full opacity-0"
-          style={{
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            background: p.color,
-            left: p.left,
-            top: p.top,
-            animation: `floatParticle ${p.duration}s ${p.delay}s linear infinite`,
-          }}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-green-500" />
+        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Brand DNA Extracted</span>
+      </div>
+      <div className="p-4 space-y-4">
+        <div>
+          <p className="text-lg font-700 text-zinc-50">{brand.name}</p>
+          <p className="text-sm text-zinc-400 mt-0.5">{brand.niche}</p>
+        </div>
+
+        {dna?.colors && dna.colors.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Colors</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {dna.colors.map((c, i) => (
+                <div
+                  key={i}
+                  className="w-6 h-6 rounded-full border border-zinc-700"
+                  style={{ background: c }}
+                  title={c}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {dna?.voice_tone && (
+          <div>
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Voice</p>
+            <p className="text-sm text-zinc-300 italic">"{dna.voice_tone}"</p>
+          </div>
+        )}
+
+        {dna?.keywords && dna.keywords.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Keywords</p>
+            <div className="flex flex-wrap gap-1.5">
+              {dna.keywords.slice(0, 6).map((kw, i) => (
+                <span
+                  key={i}
+                  className="text-xs px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700"
+                >
+                  {kw}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {dna?.personality && (
+          <p className="text-sm text-zinc-400 leading-relaxed line-clamp-2">{dna.personality}</p>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+// ─── Platform Picker ──────────────────────────────────────────────────────────
+
+function PlatformPicker({
+  selected,
+  onChange,
+  onConfirm,
+}: {
+  selected: Platform[]
+  onChange: (p: Platform[]) => void
+  onConfirm: () => void
+}) {
+  const toggle = (id: Platform) => {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-zinc-800">
+        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Choose Platforms</p>
+      </div>
+      <div className="p-4 space-y-4">
+        <div className="grid grid-cols-2 gap-2">
+          {PLATFORMS.map((p) => {
+            const active = selected.includes(p.id)
+            return (
+              <button
+                key={p.id}
+                onClick={() => toggle(p.id)}
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150 cursor-pointer text-left"
+                style={{
+                  background: active ? 'rgba(250,250,250,0.06)' : 'transparent',
+                  borderColor: active ? 'rgba(250,250,250,0.2)' : '#27272a',
+                  color: active ? '#f4f4f5' : '#71717a',
+                }}
+              >
+                <span
+                  className={`platform-${p.id} w-3 h-3 rounded-full flex-shrink-0`}
+                />
+                {p.label}
+                {active && <Check size={12} className="ml-auto flex-shrink-0" />}
+              </button>
+            )
+          })}
+        </div>
+
+        <button
+          onClick={onConfirm}
+          disabled={selected.length === 0}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background: '#fafafa', color: '#09090b' }}
+        >
+          Continue
+          <ArrowRight size={14} />
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+// ─── Posts Picker ─────────────────────────────────────────────────────────────
+
+function PostsPicker({
+  value,
+  onChange,
+  onLaunch,
+  loading,
+}: {
+  value: number
+  onChange: (n: number) => void
+  onLaunch: () => void
+  loading: boolean
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-zinc-800">
+        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Number of Posts</p>
+      </div>
+      <div className="p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-zinc-400">Posts per platform</span>
+          <span className="text-lg font-700 text-zinc-50">{value}</span>
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={10}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full cursor-pointer accent-violet-500"
         />
-      ))}
-      <style>{`
-        @keyframes floatParticle {
-          0% { opacity: 0; transform: translateY(0px) scale(1); }
-          10% { opacity: 0.6; }
-          90% { opacity: 0.3; }
-          100% { opacity: 0; transform: translateY(-120vh) scale(0.5); }
-        }
-      `}</style>
+        <div className="flex justify-between text-xs text-zinc-600">
+          <span>1</span>
+          <span>10</span>
+        </div>
+
+        <button
+          onClick={onLaunch}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{ background: '#fafafa', color: '#09090b' }}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              Launching...
+            </>
+          ) : (
+            <>
+              Launch Campaign
+              <ArrowRight size={14} />
+            </>
+          )}
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+// ─── AI Avatar ────────────────────────────────────────────────────────────────
+
+function AIAvatar() {
+  return (
+    <div
+      className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold gradient-text"
+      style={{ background: '#1c1c1f', border: '1px solid #27272a', color: '#e879f9' }}
+    >
+      B
     </div>
   )
 }
 
-// ─── Platform data ────────────────────────────────────────────────────────────
+// ─── Chat Message ─────────────────────────────────────────────────────────────
 
-const PLATFORMS: { id: Platform; label: string }[] = [
-  { id: 'instagram', label: 'Instagram' },
-  { id: 'twitter', label: 'X (Twitter)' },
-  { id: 'linkedin', label: 'LinkedIn' },
-  { id: 'facebook', label: 'Facebook' },
-  { id: 'tiktok', label: 'TikTok' },
-  { id: 'youtube', label: 'YouTube' },
-]
+function ChatMessageItem({
+  message,
+  selectedPlatforms,
+  onPlatformsChange,
+  onPlatformsConfirm,
+  numPosts,
+  onNumPostsChange,
+  onLaunch,
+  launching,
+}: {
+  message: ChatMessage
+  selectedPlatforms: Platform[]
+  onPlatformsChange: (p: Platform[]) => void
+  onPlatformsConfirm: () => void
+  numPosts: number
+  onNumPostsChange: (n: number) => void
+  onLaunch: () => void
+  launching: boolean
+}) {
+  if (message.role === 'ai') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-start gap-3"
+      >
+        <AIAvatar />
+        <div
+          className="px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-zinc-200 max-w-[85%]"
+          style={{ background: '#27272a' }}
+        >
+          {message.content}
+        </div>
+      </motion.div>
+    )
+  }
 
-// ─── Step Indicator ───────────────────────────────────────────────────────────
+  if (message.role === 'user') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-end"
+      >
+        <div
+          className="px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-zinc-50 max-w-[85%]"
+          style={{ background: '#3f3f46' }}
+        >
+          {message.content}
+        </div>
+      </motion.div>
+    )
+  }
 
-function StepIndicator({ current, total }: { current: number; total: number }) {
-  return (
-    <div className="flex items-center gap-2 mb-8">
-      {Array.from({ length: total }).map((_, i) => (
-        <div key={i} className="flex items-center">
-          <motion.div
-            animate={{
-              background: i < current ? '#10b981' : i === current ? '#7c3aed' : '#2d2d3d',
-              scale: i === current ? 1.2 : 1,
-            }}
-            transition={{ duration: 0.3 }}
-            className="w-2 h-2 rounded-full"
-          />
-          {i < total - 1 && (
-            <motion.div
-              animate={{ background: i < current ? '#10b981' : '#2d2d3d' }}
-              transition={{ duration: 0.3 }}
-              className="w-8 h-px mx-1"
+  if (message.role === 'card') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-start gap-3"
+      >
+        <AIAvatar />
+        <div className="flex-1 max-w-[85%]">
+          {message.card === 'loading' && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-sm" style={{ background: '#27272a' }}>
+              <motion.div
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+                className="flex gap-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+              </motion.div>
+              <span className="text-xs text-zinc-500">Analyzing your brand...</span>
+            </div>
+          )}
+          {message.card === 'brand-dna' && message.brand && (
+            <BrandDNABlock brand={message.brand} />
+          )}
+          {message.card === 'platform-picker' && (
+            <PlatformPicker
+              selected={selectedPlatforms}
+              onChange={onPlatformsChange}
+              onConfirm={onPlatformsConfirm}
+            />
+          )}
+          {message.card === 'posts-picker' && (
+            <PostsPicker
+              value={numPosts}
+              onChange={onNumPostsChange}
+              onLaunch={onLaunch}
+              loading={launching}
             />
           )}
         </div>
-      ))}
-      <span className="ml-3 text-sm" style={{ color: '#94a3b8' }}>
-        Step {current + 1} of {total}
-      </span>
+      </motion.div>
+    )
+  }
+
+  return null
+}
+
+// ─── File Chip ────────────────────────────────────────────────────────────────
+
+function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
+  return (
+    <div
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium"
+      style={{ background: '#27272a', color: '#a1a1aa', border: '1px solid #3f3f46' }}
+    >
+      <span className="max-w-[100px] truncate">{file.name}</span>
+      <button onClick={onRemove} className="flex-shrink-0 hover:text-zinc-50 transition-colors cursor-pointer">
+        <X size={10} />
+      </button>
     </div>
   )
 }
@@ -107,512 +379,362 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 
 export default function HomePage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [step, setStep] = useState(0)
-  const [generating, setGenerating] = useState(false)
-
-  // Form state
-  const [name, setName] = useState('')
-  const [niche, setNiche] = useState('')
-  const [description, setDescription] = useState('')
-  const [brandContext, setBrandContext] = useState('')
-  const [websiteUrl, setWebsiteUrl] = useState('')
+  const [pageLoading, setPageLoading] = useState(true)
+  const [phase, setPhase] = useState<Phase>('brand-input')
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [inputValue, setInputValue] = useState('')
+  const [detectedUrl, setDetectedUrl] = useState<string | null>(null)
   const [files, setFiles] = useState<File[]>([])
-  const [goal, setGoal] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['instagram', 'twitter'])
   const [numPosts, setNumPosts] = useState(5)
+  const [campaignGoal, setCampaignGoal] = useState('')
+  const [createdBrand, setCreatedBrand] = useState<Brand | null>(null)
+  const [launching, setLaunching] = useState(false)
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Scroll to bottom when messages change
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
+  // Check for existing brands on load
   useEffect(() => {
     getBrands()
       .then((brands) => {
         if (brands && brands.length > 0) {
           router.replace('/dashboard')
         } else {
-          setLoading(false)
+          setPageLoading(false)
+          // Show greeting
+          setMessages([
+            {
+              id: 'greeting',
+              role: 'ai',
+              content:
+                "Hi, I'm Britney — your AI marketing agent. Tell me about your brand. You can describe it in a few sentences, paste your website URL, or upload brand assets.",
+            },
+          ])
         }
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        setPageLoading(false)
+        setMessages([
+          {
+            id: 'greeting',
+            role: 'ai',
+            content:
+              "Hi, I'm Britney — your AI marketing agent. Tell me about your brand. You can describe it in a few sentences, paste your website URL, or upload brand assets.",
+          },
+        ])
+      })
   }, [router])
 
-  const togglePlatform = (p: Platform) => {
-    setSelectedPlatforms((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
-    )
+  // Auto-resize textarea
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
+  }, [inputValue])
+
+  // Detect URL in input
+  useEffect(() => {
+    setDetectedUrl(detectUrl(inputValue))
+  }, [inputValue])
+
+  const addMessage = (msg: Omit<ChatMessage, 'id'>) => {
+    const id = Math.random().toString(36).slice(2)
+    setMessages((prev) => [...prev, { ...msg, id }])
+    return id
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFiles(Array.from(e.target.files))
-    }
+  const updateMessage = (id: string, updates: Partial<ChatMessage>) => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
   }
 
-  const handleGenerate = async () => {
-    if (!name.trim() || !niche.trim()) {
-      toast.error('Please fill in brand name and niche')
-      setStep(0)
-      return
-    }
-    if (selectedPlatforms.length === 0) {
-      toast.error('Select at least one platform')
-      return
-    }
-    if (!goal.trim()) {
-      toast.error('Please enter a campaign goal')
-      return
-    }
+  const handleBrandSubmit = async () => {
+    const text = inputValue.trim()
+    if (!text && files.length === 0) return
 
-    setStep(3)
-    setGenerating(true)
+    // User message
+    let userContent = text
+    if (files.length > 0) {
+      userContent += userContent ? ` [+ ${files.length} file(s)]` : `[${files.length} file(s) attached]`
+    }
+    addMessage({ role: 'user', content: userContent })
+    setInputValue('')
+    setFiles([])
+
+    // Show loading card
+    const loadingId = addMessage({ role: 'card', card: 'loading' })
+    setPhase('brand-processing')
 
     try {
       const form = new FormData()
-      form.append('name', name.trim())
-      form.append('niche', niche.trim())
-      form.append('description', description.trim())
-      if (brandContext.trim()) form.append('brand_context', brandContext.trim())
-      if (websiteUrl.trim()) form.append('website_url', websiteUrl.trim())
+      form.append('name', '')
+      form.append('description', '')
+      form.append('niche', '')
+      form.append('text_context', text)
+      if (detectedUrl) form.append('website_url', detectedUrl)
       for (const file of files) {
         form.append('files', file)
       }
 
       const brand = await createBrand(form)
+      setCreatedBrand(brand)
 
+      // Replace loading with brand DNA card
+      updateMessage(loadingId, { card: 'brand-dna', brand })
+      setPhase('brand-confirmed')
+
+      // AI follow-up
+      setTimeout(() => {
+        addMessage({
+          role: 'ai',
+          content: `Got it — I've extracted the DNA for ${brand.name}. Now let's set up your first campaign. What's your marketing goal?`,
+        })
+        setPhase('campaign-goal')
+      }, 400)
+    } catch (err) {
+      updateMessage(loadingId, {
+        role: 'ai',
+        card: undefined,
+        content: 'Something went wrong analyzing your brand. Try again with more details.',
+      })
+      setPhase('brand-input')
+      toast.error(err instanceof Error ? err.message : 'Failed to analyze brand')
+    }
+  }
+
+  const handleGoalSubmit = async () => {
+    const text = inputValue.trim()
+    if (!text) return
+
+    setCampaignGoal(text)
+    addMessage({ role: 'user', content: text })
+    setInputValue('')
+    setPhase('campaign-platforms')
+
+    setTimeout(() => {
+      addMessage({
+        role: 'ai',
+        content: 'Great goal. Which platforms should we create content for?',
+      })
+      addMessage({ role: 'card', card: 'platform-picker' })
+    }, 300)
+  }
+
+  const handlePlatformsConfirm = () => {
+    if (selectedPlatforms.length === 0) {
+      toast.error('Select at least one platform')
+      return
+    }
+
+    addMessage({
+      role: 'user',
+      content: selectedPlatforms.map((p) => PLATFORMS.find((x) => x.id === p)?.label ?? p).join(', '),
+    })
+    setPhase('campaign-posts')
+
+    setTimeout(() => {
+      addMessage({
+        role: 'ai',
+        content: 'How many posts should I generate per platform?',
+      })
+      addMessage({ role: 'card', card: 'posts-picker' })
+    }, 300)
+  }
+
+  const handleLaunchCampaign = async () => {
+    if (!createdBrand) return
+
+    setLaunching(true)
+
+    try {
       const campaign = await createCampaign({
-        brand_id: brand.id,
-        goal: goal.trim(),
+        brand_id: createdBrand.id,
+        goal: campaignGoal,
         platforms: selectedPlatforms,
         num_posts: numPosts,
       })
 
       await startCampaign(campaign.id)
 
-      router.push(`/campaign/${campaign.id}`)
+      addMessage({
+        role: 'ai',
+        content: `Campaign created. Britney is spinning up ${numPosts * selectedPlatforms.length} posts across ${selectedPlatforms.length} platform${selectedPlatforms.length > 1 ? 's' : ''}. Taking you to the pipeline now...`,
+      })
+
+      setPhase('done')
+
+      setTimeout(() => {
+        router.push(`/campaign/${campaign.id}`)
+      }, 1200)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong'
-      toast.error(msg)
-      setGenerating(false)
-      setStep(2)
+      toast.error(err instanceof Error ? err.message : 'Failed to launch campaign')
+      setLaunching(false)
     }
   }
 
-  if (loading) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  const handleSend = () => {
+    if (phase === 'brand-input') handleBrandSubmit()
+    else if (phase === 'campaign-goal') handleGoalSubmit()
+  }
+
+  const canSend =
+    (phase === 'brand-input' && (inputValue.trim().length > 0 || files.length > 0)) ||
+    (phase === 'campaign-goal' && inputValue.trim().length > 0)
+
+  const showInput = phase === 'brand-input' || phase === 'campaign-goal'
+
+  if (pageLoading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#0a0a0f' }}>
-        <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+      <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
+        <div className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-200 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-6" style={{ background: '#0a0a0f' }}>
-      <ParticleBackground />
-
-      {/* Background radial glow */}
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,58,237,0.15) 0%, transparent 70%)',
-        }}
-        aria-hidden
-      />
-
-      <div className="relative z-10 w-full max-w-2xl">
-        {/* Hero header */}
-        <motion.div
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="text-center mb-12"
-        >
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Sparkles size={20} className="text-purple-400" />
-            <span className="text-sm font-medium tracking-widest uppercase" style={{ color: '#a855f7' }}>
-              AI-Powered Social Media
-            </span>
-            <Sparkles size={20} className="text-purple-400" />
+    <div className="flex flex-col h-screen bg-zinc-950">
+      {/* Header */}
+      <div className="flex-shrink-0 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+            style={{ background: '#1c1c1f', border: '1px solid #27272a', color: '#e879f9' }}
+          >
+            B
           </div>
-          <h1 className="text-6xl font-extrabold mb-4 gradient-text">
-            Meet Britney
-          </h1>
-          <p className="text-lg" style={{ color: '#94a3b8' }}>
-            Your autonomous AI marketing agent. Set your brand, watch the magic.
-          </p>
-        </motion.div>
+          <div>
+            <h1 className="text-sm font-700 gradient-text leading-none">Britney</h1>
+            <p className="text-xs text-zinc-500 mt-0.5">AI Marketing Agent</p>
+          </div>
+        </div>
+      </div>
 
-        {/* Wizard card */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="glass rounded-2xl p-8"
-        >
-          <AnimatePresence mode="wait">
-            {/* Step 0: Brand Basics */}
-            {step === 0 && (
-              <motion.div
-                key="step0"
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -30 }}
-                transition={{ duration: 0.25 }}
-              >
-                <StepIndicator current={0} total={3} />
-                <h2 className="text-2xl font-bold mb-2" style={{ color: '#f8fafc' }}>
-                  Tell us about your brand
-                </h2>
-                <p className="mb-6 text-sm" style={{ color: '#94a3b8' }}>
-                  Britney will analyze your brand DNA and craft content that feels authentically yours.
-                </p>
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+          <AnimatePresence initial={false}>
+            {messages.map((msg) => (
+              <ChatMessageItem
+                key={msg.id}
+                message={msg}
+                selectedPlatforms={selectedPlatforms}
+                onPlatformsChange={setSelectedPlatforms}
+                onPlatformsConfirm={handlePlatformsConfirm}
+                numPosts={numPosts}
+                onNumPostsChange={setNumPosts}
+                onLaunch={handleLaunchCampaign}
+                launching={launching}
+              />
+            ))}
+          </AnimatePresence>
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: '#94a3b8' }}>
-                      Brand Name *
-                    </label>
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Acme Corp"
-                      className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200"
-                      style={{
-                        background: '#1a1a2e',
-                        border: '1px solid #2d2d3d',
-                        color: '#f8fafc',
-                      }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = '#7c3aed')}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = '#2d2d3d')}
+      {/* Input bar */}
+      <AnimatePresence>
+        {showInput && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="flex-shrink-0 border-t border-zinc-800 px-4 py-4"
+          >
+            <div className="max-w-2xl mx-auto space-y-2">
+              {/* File chips */}
+              {files.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {files.map((f, i) => (
+                    <FileChip
+                      key={i}
+                      file={f}
+                      onRemove={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: '#94a3b8' }}>
-                      Niche / Industry *
-                    </label>
-                    <input
-                      value={niche}
-                      onChange={(e) => setNiche(e.target.value)}
-                      placeholder="e.g. SaaS, Fashion, Food & Beverage"
-                      className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200"
-                      style={{
-                        background: '#1a1a2e',
-                        border: '1px solid #2d2d3d',
-                        color: '#f8fafc',
-                      }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = '#7c3aed')}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = '#2d2d3d')}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: '#94a3b8' }}>
-                      Brand Description
-                    </label>
-                    <textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="What does your brand stand for? What makes it unique?"
-                      rows={3}
-                      className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 resize-none"
-                      style={{
-                        background: '#1a1a2e',
-                        border: '1px solid #2d2d3d',
-                        color: '#f8fafc',
-                      }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = '#7c3aed')}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = '#2d2d3d')}
-                    />
-                  </div>
+                  ))}
                 </div>
+              )}
 
-                <button
-                  onClick={() => {
-                    if (!name.trim() || !niche.trim()) {
-                      toast.error('Brand name and niche are required')
-                      return
-                    }
-                    setStep(1)
-                  }}
-                  className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold cursor-pointer transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-                  style={{ background: '#7c3aed', color: '#f8fafc' }}
+              {/* URL preview */}
+              {detectedUrl && (
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+                  style={{ background: '#27272a', border: '1px solid #3f3f46' }}
                 >
-                  Continue
-                  <ArrowRight size={16} />
+                  <Globe size={12} className="text-zinc-500 flex-shrink-0" />
+                  <span className="text-zinc-400 truncate">{detectedUrl}</span>
+                  <span className="text-zinc-600 flex-shrink-0">will be scraped</span>
+                </div>
+              )}
+
+              {/* Input row */}
+              <div
+                className="flex items-end gap-2 rounded-xl px-3 py-2"
+                style={{ background: '#27272a', border: '1px solid #3f3f46' }}
+              >
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex-shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                  title="Attach files"
+                >
+                  <Paperclip size={16} />
                 </button>
-              </motion.div>
-            )}
 
-            {/* Step 1: Brand Context */}
-            {step === 1 && (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -30 }}
-                transition={{ duration: 0.25 }}
-              >
-                <StepIndicator current={1} total={3} />
-                <h2 className="text-2xl font-bold mb-2" style={{ color: '#f8fafc' }}>
-                  Add brand context{' '}
-                  <span className="text-sm font-normal" style={{ color: '#94a3b8' }}>(optional)</span>
-                </h2>
-                <p className="mb-6 text-sm" style={{ color: '#94a3b8' }}>
-                  The more context you give, the better Britney understands your brand voice.
-                </p>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: '#94a3b8' }}>
-                      <Globe size={14} className="inline mr-1.5" />
-                      Website URL
-                    </label>
-                    <input
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
-                      placeholder="https://yourbrand.com"
-                      type="url"
-                      className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200"
-                      style={{
-                        background: '#1a1a2e',
-                        border: '1px solid #2d2d3d',
-                        color: '#f8fafc',
-                      }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = '#7c3aed')}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = '#2d2d3d')}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: '#94a3b8' }}>
-                      <FileText size={14} className="inline mr-1.5" />
-                      Additional Context
-                    </label>
-                    <textarea
-                      value={brandContext}
-                      onChange={(e) => setBrandContext(e.target.value)}
-                      placeholder="Paste brand guidelines, tone of voice notes, target audience details..."
-                      rows={4}
-                      className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 resize-none"
-                      style={{
-                        background: '#1a1a2e',
-                        border: '1px solid #2d2d3d',
-                        color: '#f8fafc',
-                      }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = '#7c3aed')}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = '#2d2d3d')}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: '#94a3b8' }}>
-                      <Upload size={14} className="inline mr-1.5" />
-                      Upload Files{' '}
-                      <span className="text-xs" style={{ color: '#475569' }}>(images, PDFs, docs)</span>
-                    </label>
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full py-6 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 cursor-pointer transition-all duration-200 hover:border-purple-500 hover:bg-purple-500/5"
-                      style={{ borderColor: '#2d2d3d', color: '#94a3b8' }}
-                    >
-                      <Upload size={20} />
-                      <span className="text-sm">Click to upload files</span>
-                      {files.length > 0 && (
-                        <span className="text-xs" style={{ color: '#a855f7' }}>
-                          {files.length} file(s) selected
-                        </span>
-                      )}
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/*,.pdf,.doc,.docx,.txt"
-                      onChange={handleFileChange}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => setStep(0)}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl font-semibold cursor-pointer transition-all duration-200 hover:opacity-80"
-                    style={{ background: '#1a1a2e', color: '#94a3b8' }}
-                  >
-                    <ArrowLeft size={16} />
-                    Back
-                  </button>
-                  <button
-                    onClick={() => setStep(2)}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold cursor-pointer transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-                    style={{ background: '#7c3aed', color: '#f8fafc' }}
-                  >
-                    Continue
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 2: Campaign Goal + Platforms */}
-            {step === 2 && (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -30 }}
-                transition={{ duration: 0.25 }}
-              >
-                <StepIndicator current={2} total={3} />
-                <h2 className="text-2xl font-bold mb-2" style={{ color: '#f8fafc' }}>
-                  Launch your campaign
-                </h2>
-                <p className="mb-6 text-sm" style={{ color: '#94a3b8' }}>
-                  Define your goal and where you want to publish.
-                </p>
-
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium mb-1.5" style={{ color: '#94a3b8' }}>
-                      <Zap size={14} className="inline mr-1.5" />
-                      Campaign Goal *
-                    </label>
-                    <textarea
-                      value={goal}
-                      onChange={(e) => setGoal(e.target.value)}
-                      placeholder="e.g. Drive awareness for our new product launch targeting Gen Z"
-                      rows={2}
-                      className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 resize-none"
-                      style={{
-                        background: '#1a1a2e',
-                        border: '1px solid #2d2d3d',
-                        color: '#f8fafc',
-                      }}
-                      onFocus={(e) => (e.currentTarget.style.borderColor = '#7c3aed')}
-                      onBlur={(e) => (e.currentTarget.style.borderColor = '#2d2d3d')}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: '#94a3b8' }}>
-                      Platforms
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {PLATFORMS.map((p) => {
-                        const active = selectedPlatforms.includes(p.id)
-                        return (
-                          <button
-                            key={p.id}
-                            onClick={() => togglePlatform(p.id)}
-                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200"
-                            style={{
-                              background: active ? 'rgba(124,58,237,0.2)' : '#1a1a2e',
-                              border: `1px solid ${active ? '#7c3aed' : '#2d2d3d'}`,
-                              color: active ? '#a855f7' : '#94a3b8',
-                            }}
-                          >
-                            {active && <Check size={12} />}
-                            <span className={`platform-${p.id} inline-block w-2 h-2 rounded-full`} />
-                            {p.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: '#94a3b8' }}>
-                      Number of Posts:{' '}
-                      <span className="font-bold" style={{ color: '#a855f7' }}>
-                        {numPosts}
-                      </span>
-                    </label>
-                    <input
-                      type="range"
-                      min={1}
-                      max={10}
-                      value={numPosts}
-                      onChange={(e) => setNumPosts(Number(e.target.value))}
-                      className="w-full cursor-pointer accent-purple-600"
-                    />
-                    <div className="flex justify-between text-xs mt-1" style={{ color: '#475569' }}>
-                      <span>1</span>
-                      <span>10</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 mt-6">
-                  <button
-                    onClick={() => setStep(1)}
-                    className="flex items-center gap-2 px-4 py-3 rounded-xl font-semibold cursor-pointer transition-all duration-200 hover:opacity-80"
-                    style={{ background: '#1a1a2e', color: '#94a3b8' }}
-                  >
-                    <ArrowLeft size={16} />
-                    Back
-                  </button>
-                  <button
-                    onClick={handleGenerate}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold cursor-pointer transition-all duration-200 hover:opacity-90 active:scale-[0.98] glow-purple"
-                    style={{ background: '#7c3aed', color: '#f8fafc' }}
-                  >
-                    <Sparkles size={16} />
-                    Launch Britney
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Step 3: Generating */}
-            {step === 3 && generating && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                className="text-center py-8"
-              >
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                  className="w-16 h-16 mx-auto mb-6 rounded-full"
-                  style={{
-                    background: 'conic-gradient(from 0deg, #7c3aed, #a855f7, #7c3aed)',
-                  }}
+                <textarea
+                  ref={textareaRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    phase === 'brand-input'
+                      ? 'Describe your brand, paste a URL, or just say what you do...'
+                      : 'e.g. Drive awareness for our new product launch...'
+                  }
+                  className="flex-1 bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder-zinc-600 min-h-[24px] max-h-[120px]"
+                  rows={1}
                 />
 
-                <h2 className="text-2xl font-bold mb-3 gradient-text">
-                  Britney is spinning up...
-                </h2>
-                <p className="text-sm mb-6" style={{ color: '#94a3b8' }}>
-                  Building your brand DNA and preparing the AI pipeline. This will only take a moment.
-                </p>
+                <button
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{ background: canSend ? '#fafafa' : 'transparent' }}
+                >
+                  <Send size={14} style={{ color: canSend ? '#09090b' : '#52525b' }} />
+                </button>
+              </div>
 
-                {['Analyzing brand identity', 'Spinning up research agent', 'Configuring creative pipeline'].map(
-                  (label, i) => (
-                    <motion.div
-                      key={label}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.5 }}
-                      className="flex items-center gap-3 text-sm mb-2 justify-center"
-                      style={{ color: '#94a3b8' }}
-                    >
-                      <motion.div
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
-                        className="w-1.5 h-1.5 rounded-full bg-purple-500"
-                      />
-                      {label}
-                    </motion.div>
-                  ),
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt"
+                onChange={(e) => {
+                  if (e.target.files) setFiles(Array.from(e.target.files))
+                }}
+                className="hidden"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

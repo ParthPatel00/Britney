@@ -2,7 +2,16 @@
 
 import { useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Clock, Loader2, CheckCircle2, XCircle, Search, Lightbulb, Palette, Send } from 'lucide-react'
+import {
+  Clock,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Search,
+  Lightbulb,
+  Palette,
+  Send,
+} from 'lucide-react'
 import type { AgentName } from '../../lib/types'
 import { getAgentLabel } from '../../lib/utils'
 
@@ -20,45 +29,50 @@ interface AgentNodeProps {
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 
 const AGENT_ICONS: Record<AgentName, React.ReactNode> = {
-  research: <Search size={20} />,
-  strategy: <Lightbulb size={20} />,
-  creative: <Palette size={20} />,
-  publishing: <Send size={20} />,
+  research: <Search size={18} />,
+  strategy: <Lightbulb size={18} />,
+  creative: <Palette size={18} />,
+  publishing: <Send size={18} />,
 }
 
 // ─── Progress Ring ────────────────────────────────────────────────────────────
 
 function ProgressRing({ progress, status }: { progress: number; status: AgentStatus }) {
-  const radius = 28
+  const radius = 22
   const circumference = 2 * Math.PI * radius
   const strokeDashoffset = circumference - (progress / 100) * circumference
 
   const strokeColor =
     status === 'complete'
-      ? '#10b981'
+      ? '#22c55e'
       : status === 'error'
         ? '#ef4444'
-        : '#7c3aed'
+        : status === 'active'
+          ? '#e4e4e7'
+          : '#27272a'
 
   return (
-    <svg width="72" height="72" className="absolute inset-0 m-auto" style={{ transform: 'rotate(-90deg)' }}>
-      {/* Track */}
+    <svg
+      width="56"
+      height="56"
+      className="absolute inset-0"
+      style={{ transform: 'rotate(-90deg)' }}
+    >
       <circle
-        cx="36"
-        cy="36"
+        cx="28"
+        cy="28"
         r={radius}
         fill="none"
-        stroke="#2d2d3d"
-        strokeWidth="3"
+        stroke="#27272a"
+        strokeWidth="2.5"
       />
-      {/* Progress */}
       <motion.circle
-        cx="36"
-        cy="36"
+        cx="28"
+        cy="28"
         r={radius}
         fill="none"
         stroke={strokeColor}
-        strokeWidth="3"
+        strokeWidth="2.5"
         strokeLinecap="round"
         strokeDasharray={circumference}
         animate={{ strokeDashoffset }}
@@ -68,34 +82,46 @@ function ProgressRing({ progress, status }: { progress: number; status: AgentSta
   )
 }
 
-// ─── Status Icon ──────────────────────────────────────────────────────────────
+// ─── Status center ────────────────────────────────────────────────────────────
 
-function StatusIcon({ status }: { status: AgentStatus }) {
-  if (status === 'idle') return <Clock size={16} style={{ color: '#94a3b8' }} />
-  if (status === 'active') {
-    return (
-      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}>
-        <Loader2 size={16} style={{ color: '#a855f7' }} />
+function StatusCenter({ status, progress }: { status: AgentStatus; progress: number }) {
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={status}
+        initial={{ opacity: 0, scale: 0.7 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.7 }}
+        transition={{ duration: 0.18 }}
+        className="flex flex-col items-center gap-0.5"
+      >
+        {status === 'idle' && <Clock size={14} className="text-zinc-600" />}
+        {status === 'active' && (
+          <>
+            <Loader2 size={14} className="text-zinc-300 animate-spin" />
+            <span className="text-[10px] font-bold text-zinc-300">{Math.round(progress)}%</span>
+          </>
+        )}
+        {status === 'complete' && <CheckCircle2 size={14} className="text-green-500" />}
+        {status === 'error' && <XCircle size={14} className="text-red-400" />}
       </motion.div>
-    )
-  }
-  if (status === 'complete') return <CheckCircle2 size={16} style={{ color: '#10b981' }} />
-  return <XCircle size={16} style={{ color: '#ef4444' }} />
+    </AnimatePresence>
+  )
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: AgentStatus }) {
   const cfg = {
-    idle: { label: 'Waiting', bg: '#1a1a2e', color: '#94a3b8', border: '#2d2d3d' },
-    active: { label: 'Running', bg: 'rgba(124,58,237,0.15)', color: '#a855f7', border: '#7c3aed' },
-    complete: { label: 'Complete', bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: '#10b981' },
-    error: { label: 'Error', bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '#ef4444' },
+    idle: { label: 'Waiting', color: '#52525b', bg: 'transparent', border: '#27272a' },
+    active: { label: 'Running', color: '#e4e4e7', bg: 'rgba(250,250,250,0.06)', border: 'rgba(250,250,250,0.15)' },
+    complete: { label: 'Complete', color: '#22c55e', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.25)' },
+    error: { label: 'Error', color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' },
   }[status]
 
   return (
     <span
-      className="text-xs font-medium px-2 py-0.5 rounded-full"
+      className="text-[11px] font-medium px-2 py-0.5 rounded-full"
       style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}
     >
       {cfg.label}
@@ -108,7 +134,6 @@ function StatusBadge({ status }: { status: AgentStatus }) {
 export default function AgentNode({ agent, status, progress, logs }: AgentNodeProps) {
   const logsRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll logs
   useEffect(() => {
     if (logsRef.current) {
       logsRef.current.scrollTop = logsRef.current.scrollHeight
@@ -119,86 +144,58 @@ export default function AgentNode({ agent, status, progress, logs }: AgentNodePr
 
   const borderColor =
     status === 'active'
-      ? '#7c3aed'
+      ? 'rgba(250,250,250,0.15)'
       : status === 'complete'
-        ? '#10b981'
+        ? 'rgba(34,197,94,0.3)'
+        : status === 'error'
+          ? 'rgba(239,68,68,0.3)'
+          : '#1c1c1f'
+
+  const iconColor =
+    status === 'active'
+      ? '#e4e4e7'
+      : status === 'complete'
+        ? '#22c55e'
         : status === 'error'
           ? '#ef4444'
-          : '#2d2d3d'
-
-  const glowClass =
-    status === 'active'
-      ? 'agent-active'
-      : status === 'complete'
-        ? 'glow-green'
-        : status === 'error'
-          ? 'glow-red'
-          : ''
+          : '#3f3f46'
 
   return (
     <motion.div
       layout
-      variants={{
-        idle: { opacity: 0.7, scale: 1 },
-        active: { opacity: 1, scale: 1.02 },
-        complete: { opacity: 1, scale: 1 },
-        error: { opacity: 1, scale: 1 },
+      animate={{
+        opacity: status === 'idle' ? 0.6 : 1,
+        scale: status === 'active' ? 1.01 : 1,
       }}
-      animate={status}
-      transition={{ duration: 0.3 }}
-      className={`rounded-2xl p-4 flex flex-col gap-3 min-h-[280px] ${glowClass}`}
+      transition={{ duration: 0.25 }}
+      className={`rounded-xl p-4 flex flex-col gap-3 min-h-[260px] ${status === 'active' ? 'agent-pulse' : ''}`}
       style={{
-        background: '#12121a',
+        background: '#111113',
         border: `1px solid ${borderColor}`,
         transition: 'border-color 0.3s ease',
       }}
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <motion.div
-            animate={{
-              color:
-                status === 'active'
-                  ? '#a855f7'
-                  : status === 'complete'
-                    ? '#10b981'
-                    : status === 'error'
-                      ? '#ef4444'
-                      : '#94a3b8',
-            }}
+            animate={{ color: iconColor }}
             transition={{ duration: 0.3 }}
           >
             {AGENT_ICONS[agent]}
           </motion.div>
-          <span className="text-sm font-semibold" style={{ color: '#f8fafc' }}>
+          <span className="text-sm font-semibold text-zinc-100">
             {getAgentLabel(agent)}
           </span>
         </div>
         <StatusBadge status={status} />
       </div>
 
-      {/* Progress ring + status icon */}
-      <div className="relative w-[72px] h-[72px] mx-auto flex-shrink-0">
+      {/* Progress ring */}
+      <div className="relative w-14 h-14 mx-auto flex-shrink-0">
         <ProgressRing progress={progress} status={status} />
         <div className="absolute inset-0 flex items-center justify-center">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={status}
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 0.2 }}
-              className="flex flex-col items-center gap-0.5"
-            >
-              <StatusIcon status={status} />
-              {status === 'active' && (
-                <span className="text-xs font-bold" style={{ color: '#a855f7' }}>
-                  {Math.round(progress)}%
-                </span>
-              )}
-            </motion.div>
-          </AnimatePresence>
+          <StatusCenter status={status} progress={progress} />
         </div>
       </div>
 
@@ -209,18 +206,20 @@ export default function AgentNode({ agent, status, progress, logs }: AgentNodePr
         style={{ scrollbarWidth: 'none' }}
       >
         {recentLogs.length === 0 ? (
-          <p className="text-xs italic" style={{ color: '#475569' }}>
+          <p className="text-[11px] italic text-zinc-700">
             {status === 'idle' ? 'Waiting to start...' : 'No logs yet'}
           </p>
         ) : (
           recentLogs.map((log, i) => (
             <motion.p
               key={`${log}-${i}`}
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 3 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className={`text-xs leading-relaxed ${i === recentLogs.length - 1 && status === 'active' ? 'streaming-cursor' : ''}`}
-              style={{ color: i === recentLogs.length - 1 ? '#94a3b8' : '#475569' }}
+              transition={{ duration: 0.15 }}
+              className={`text-[11px] leading-relaxed font-mono ${
+                i === recentLogs.length - 1 && status === 'active' ? 'streaming-cursor' : ''
+              }`}
+              style={{ color: i === recentLogs.length - 1 ? '#a1a1aa' : '#52525b' }}
             >
               {log}
             </motion.p>
