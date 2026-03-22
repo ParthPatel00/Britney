@@ -5,42 +5,46 @@ import AgentNode from './AgentNode'
 import { useCampaignStore } from '../../store/campaignStore'
 import type { AgentName } from '../../lib/types'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 type AgentStatus = 'idle' | 'active' | 'complete' | 'error'
 
-// ─── Connector ────────────────────────────────────────────────────────────────
+// ─── Connector ─────────────────────────────────────────────────────────────────
 
 function Connector({ active }: { active: boolean }) {
   return (
-    <div className="hidden md:flex items-center justify-center flex-shrink-0 w-10">
-      <svg width="40" height="2" viewBox="0 0 40 2" fill="none">
-        {/* Track */}
-        <line x1="0" y1="1" x2="40" y2="1" stroke="#27272a" strokeWidth="1.5" />
-        {/* Active fill */}
+    <div className="hidden md:flex items-center justify-center flex-shrink-0 w-12">
+      <div className="relative w-full h-px" style={{ background: 'rgba(255,255,255,0.06)' }}>
         {active && (
-          <motion.line
-            x1="0"
-            y1="1"
-            x2="40"
-            y2="1"
-            stroke="#22c55e"
-            strokeWidth="1.5"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
+          <motion.div
+            className="absolute inset-0 h-px"
+            initial={{ scaleX: 0, originX: 0 }}
+            animate={{ scaleX: 1 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
+            style={{
+              background: 'linear-gradient(90deg, #22c55e, #34d399)',
+              boxShadow: '0 0 8px rgba(34,197,94,0.5)',
+            }}
           />
         )}
-      </svg>
+        {/* Arrow dot */}
+        <div
+          className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
+          style={{
+            background: active ? '#22c55e' : 'rgba(255,255,255,0.1)',
+            boxShadow: active ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
+          }}
+        />
+      </div>
     </div>
   )
 }
 
-// ─── Agents ────────────────────────────────────────────────────────────────────
+// ─── Agents ─────────────────────────────────────────────────────────────────────
 
 const AGENTS: AgentName[] = ['research', 'strategy', 'creative', 'publishing']
 
-// ─── PipelineView ─────────────────────────────────────────────────────────────
+// ─── PipelineView ──────────────────────────────────────────────────────────────
 
 export default function PipelineView() {
   const pipelineState = useCampaignStore((s) => s.pipelineState)
@@ -84,18 +88,27 @@ export default function PipelineView() {
           const status: AgentStatus = pipelineState[agent]
           const prevStatus: AgentStatus =
             idx > 0 ? pipelineState[AGENTS[idx - 1]] : 'complete'
+          const connectorActive = prevStatus === 'complete'
 
           return (
             <div key={agent}>
               {idx > 0 && (
                 <div className="flex justify-center my-1.5">
-                  <motion.div
-                    className="w-px h-5"
-                    animate={{
-                      background: prevStatus === 'complete' ? '#22c55e' : '#27272a',
-                    }}
-                    transition={{ duration: 0.3 }}
-                  />
+                  <div className="relative w-px h-6">
+                    <div className="absolute inset-0" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                    {connectorActive && (
+                      <motion.div
+                        className="absolute inset-0"
+                        initial={{ scaleY: 0, originY: 0 }}
+                        animate={{ scaleY: 1 }}
+                        transition={{ duration: 0.4 }}
+                        style={{
+                          background: 'linear-gradient(180deg, #22c55e, #34d399)',
+                          boxShadow: '0 0 6px rgba(34,197,94,0.5)',
+                        }}
+                      />
+                    )}
+                  </div>
                 </div>
               )}
               <AgentNode

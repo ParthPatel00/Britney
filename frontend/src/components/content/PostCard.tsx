@@ -2,33 +2,25 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, XCircle, MessageSquare, Loader2, Image } from 'lucide-react'
+import { CheckCircle2, XCircle, MessageSquare, Loader2, ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { approvePost, rejectPost, selectVariant } from '../../lib/api'
 import { formatPlatformName } from '../../lib/utils'
 import type { Post, PostVariant } from '../../lib/types'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface PostCardProps {
-  post: Post
-  onUpdate: (post: Post) => void
-  onRefine: (post: Post) => void
-}
-
-// ─── Platform Badge ───────────────────────────────────────────────────────────
+// ─── Platform Badge ────────────────────────────────────────────────────────────
 
 function PlatformBadge({ platform }: { platform: string }) {
   return (
     <span
-      className={`platform-${platform} text-white text-[10px] font-semibold px-2 py-0.5 rounded-full`}
+      className={`platform-${platform} text-white text-[10px] font-bold px-2.5 py-1 rounded-full`}
     >
       {formatPlatformName(platform as Post['platform'])}
     </span>
   )
 }
 
-// ─── Image Preview ────────────────────────────────────────────────────────────
+// ─── Image Preview ─────────────────────────────────────────────────────────────
 
 function ImagePreview({ variant }: { variant: PostVariant | undefined }) {
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -38,8 +30,8 @@ function ImagePreview({ variant }: { variant: PostVariant | undefined }) {
 
   return (
     <div
-      className="relative w-full aspect-square rounded-lg overflow-hidden"
-      style={{ background: '#27272a' }}
+      className="relative w-full aspect-square rounded-xl overflow-hidden"
+      style={{ background: 'rgba(255,255,255,0.03)' }}
     >
       {!imgLoaded && !imgError && url && (
         <div className="absolute inset-0 skeleton" />
@@ -48,7 +40,7 @@ function ImagePreview({ variant }: { variant: PostVariant | undefined }) {
         <img
           src={url}
           alt="Generated content"
-          className="w-full h-full object-cover transition-opacity duration-300"
+          className="w-full h-full object-cover transition-opacity duration-400"
           style={{ opacity: imgLoaded ? 1 : 0 }}
           onLoad={() => setImgLoaded(true)}
           onError={() => setImgError(true)}
@@ -56,8 +48,8 @@ function ImagePreview({ variant }: { variant: PostVariant | undefined }) {
       ) : (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <Image size={20} className="mx-auto mb-1 text-zinc-700" />
-            <p className="text-[10px] text-zinc-700">No image</p>
+            <ImageIcon size={18} className="mx-auto mb-1.5" style={{ color: '#27272a' }} />
+            <p className="text-[10px]" style={{ color: '#27272a' }}>No image</p>
           </div>
         </div>
       )}
@@ -65,7 +57,7 @@ function ImagePreview({ variant }: { variant: PostVariant | undefined }) {
   )
 }
 
-// ─── A/B Toggle ──────────────────────────────────────────────────────────────
+// ─── A/B Toggle ───────────────────────────────────────────────────────────────
 
 function ABToggle({
   variants,
@@ -82,8 +74,8 @@ function ABToggle({
 
   return (
     <div
-      className="flex rounded-md p-0.5 gap-0.5"
-      style={{ background: '#27272a' }}
+      className="flex rounded-lg p-0.5 gap-0.5"
+      style={{ background: 'rgba(255,255,255,0.04)' }}
     >
       {variants.map((v) => {
         const isActive = v.id === activeId
@@ -92,10 +84,10 @@ function ABToggle({
             key={v.id}
             layout
             onClick={() => !disabled && onSelect(v.id)}
-            className="flex-1 text-[11px] font-bold py-1 px-2 rounded cursor-pointer transition-colors duration-100 disabled:cursor-not-allowed"
+            className="flex-1 text-[10px] font-bold py-1 px-2 rounded-md cursor-pointer transition-colors duration-150 disabled:cursor-not-allowed"
             animate={{
-              background: isActive ? '#fafafa' : 'transparent',
-              color: isActive ? '#09090b' : '#52525b',
+              background: isActive ? 'rgba(124,58,237,0.25)' : 'transparent',
+              color: isActive ? '#a78bfa' : '#3f3f46',
             }}
             transition={{ duration: 0.12 }}
             disabled={disabled}
@@ -108,9 +100,13 @@ function ABToggle({
   )
 }
 
-// ─── PostCard ─────────────────────────────────────────────────────────────────
+// ─── PostCard ──────────────────────────────────────────────────────────────────
 
-export default function PostCard({ post, onUpdate, onRefine }: PostCardProps) {
+export default function PostCard({ post, onUpdate, onRefine }: {
+  post: Post
+  onUpdate: (post: Post) => void
+  onRefine: (post: Post) => void
+}) {
   const [loading, setLoading] = useState<'approve' | 'reject' | 'variant' | null>(null)
 
   const activeVariantId = post.selected_variant_id ?? post.variants[0]?.id
@@ -159,52 +155,73 @@ export default function PostCard({ post, onUpdate, onRefine }: PostCardProps) {
   const isRejected = post.status === 'rejected'
   const isLocked = isApproved || isRejected
 
+  const cardBorder = isApproved
+    ? 'rgba(34,197,94,0.3)'
+    : isRejected
+      ? 'rgba(239,68,68,0.3)'
+      : 'rgba(255,255,255,0.06)'
+
+  const cardGlow = isApproved
+    ? '0 0 30px rgba(34,197,94,0.08)'
+    : isRejected
+      ? '0 0 30px rgba(239,68,68,0.08)'
+      : 'none'
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="rounded-xl overflow-hidden flex flex-col relative"
+      className="rounded-2xl overflow-hidden flex flex-col relative group cursor-default"
       style={{
-        background: '#111113',
-        border: `1px solid ${isApproved ? 'rgba(34,197,94,0.3)' : isRejected ? 'rgba(239,68,68,0.3)' : '#1c1c1f'}`,
+        background: 'rgba(18,18,26,0.9)',
+        border: `1px solid ${cardBorder}`,
+        boxShadow: cardGlow,
+        backdropFilter: 'blur(20px)',
+        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
       }}
     >
       {/* Status overlay badge */}
       <AnimatePresence>
         {isApproved && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, scale: 0.8, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0 }}
             className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
             style={{ background: 'rgba(34,197,94,0.9)', color: '#fff' }}
           >
-            <CheckCircle2 size={10} />
+            <CheckCircle2 size={9} />
             Approved
           </motion.div>
         )}
         {isRejected && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, scale: 0.8, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0 }}
             className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
             style={{ background: 'rgba(239,68,68,0.9)', color: '#fff' }}
           >
-            <XCircle size={10} />
+            <XCircle size={9} />
             Rejected
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Approved tint overlay */}
+      {/* Status background tint */}
       {isApproved && (
-        <div className="absolute inset-0 pointer-events-none z-0 rounded-xl" style={{ background: 'rgba(34,197,94,0.04)' }} />
+        <div
+          className="absolute inset-0 pointer-events-none z-0 rounded-2xl"
+          style={{ background: 'rgba(34,197,94,0.03)' }}
+        />
       )}
       {isRejected && (
-        <div className="absolute inset-0 pointer-events-none z-0 rounded-xl" style={{ background: 'rgba(239,68,68,0.04)' }} />
+        <div
+          className="absolute inset-0 pointer-events-none z-0 rounded-2xl"
+          style={{ background: 'rgba(239,68,68,0.03)' }}
+        />
       )}
 
       {/* Image */}
@@ -228,7 +245,10 @@ export default function PostCard({ post, onUpdate, onRefine }: PostCardProps) {
         </div>
 
         {/* Caption */}
-        <p className="text-xs leading-relaxed text-zinc-400 line-clamp-3">
+        <p
+          className="text-xs leading-relaxed line-clamp-3"
+          style={{ color: '#71717a' }}
+        >
           {activeVariant?.caption ?? 'No caption generated'}
         </p>
 
@@ -237,17 +257,17 @@ export default function PostCard({ post, onUpdate, onRefine }: PostCardProps) {
           <button
             onClick={handleApprove}
             disabled={!!loading || isLocked}
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all duration-150 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold cursor-pointer transition-all duration-200 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
-              background: isApproved ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.08)',
-              color: '#22c55e',
-              border: '1px solid rgba(34,197,94,0.2)',
+              background: isApproved ? 'rgba(34,197,94,0.2)' : 'rgba(34,197,94,0.07)',
+              color: '#34d399',
+              border: `1px solid ${isApproved ? 'rgba(34,197,94,0.35)' : 'rgba(34,197,94,0.15)'}`,
             }}
           >
             {loading === 'approve' ? (
-              <Loader2 size={11} className="animate-spin" />
+              <Loader2 size={10} className="animate-spin" />
             ) : (
-              <CheckCircle2 size={11} />
+              <CheckCircle2 size={10} />
             )}
             Approve
           </button>
@@ -255,17 +275,17 @@ export default function PostCard({ post, onUpdate, onRefine }: PostCardProps) {
           <button
             onClick={handleReject}
             disabled={!!loading || isLocked}
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all duration-150 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold cursor-pointer transition-all duration-200 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
-              background: isRejected ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.08)',
-              color: '#ef4444',
-              border: '1px solid rgba(239,68,68,0.2)',
+              background: isRejected ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.07)',
+              color: '#f87171',
+              border: `1px solid ${isRejected ? 'rgba(239,68,68,0.35)' : 'rgba(239,68,68,0.15)'}`,
             }}
           >
             {loading === 'reject' ? (
-              <Loader2 size={11} className="animate-spin" />
+              <Loader2 size={10} className="animate-spin" />
             ) : (
-              <XCircle size={11} />
+              <XCircle size={10} />
             )}
             Reject
           </button>
@@ -273,14 +293,14 @@ export default function PostCard({ post, onUpdate, onRefine }: PostCardProps) {
           <button
             onClick={() => onRefine(post)}
             disabled={!!loading}
-            className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-all duration-150 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+            className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-[11px] font-semibold cursor-pointer transition-all duration-200 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
             style={{
-              background: 'rgba(250,250,250,0.04)',
-              color: '#71717a',
-              border: '1px solid #27272a',
+              background: 'rgba(124,58,237,0.08)',
+              color: '#a78bfa',
+              border: '1px solid rgba(124,58,237,0.15)',
             }}
           >
-            <MessageSquare size={11} />
+            <MessageSquare size={10} />
           </button>
         </div>
       </div>

@@ -3,12 +3,12 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Paperclip, Send, X, Globe, Check, ArrowRight, Loader2 } from 'lucide-react'
+import { Paperclip, Send, X, Globe, Check, ArrowRight, Loader2, Sparkles, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { getBrands, createBrand, createCampaign, startCampaign } from '../lib/api'
 import type { Platform, Brand } from '../lib/types'
 
-// ─── Platform data ────────────────────────────────────────────────────────────
+// ─── Platform data ─────────────────────────────────────────────────────────────
 
 const PLATFORMS: { id: Platform; label: string; color: string }[] = [
   { id: 'instagram', label: 'Instagram', color: '#e1306c' },
@@ -19,7 +19,7 @@ const PLATFORMS: { id: Platform; label: string; color: string }[] = [
   { id: 'youtube', label: 'YouTube', color: '#ff0000' },
 ]
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 type Phase =
   | 'brand-input'
@@ -41,42 +41,88 @@ interface ChatMessage {
   numPosts?: number
 }
 
-// ─── URL detection ────────────────────────────────────────────────────────────
+// ─── URL detection ─────────────────────────────────────────────────────────────
 
 function detectUrl(text: string): string | null {
   const match = text.match(/https?:\/\/[^\s]+/i)
   return match ? match[0] : null
 }
 
-// ─── BrandDNA Block ───────────────────────────────────────────────────────────
+// ─── Atmospheric Background ────────────────────────────────────────────────────
+
+function AtmosphericBackground() {
+  return (
+    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      {/* Main violet glow */}
+      <div
+        className="absolute"
+        style={{
+          top: '-10%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 900,
+          height: 600,
+          background: 'radial-gradient(ellipse, rgba(124,58,237,0.12) 0%, transparent 65%)',
+          filter: 'blur(40px)',
+        }}
+      />
+      {/* Secondary accent */}
+      <div
+        className="absolute"
+        style={{
+          bottom: '10%',
+          right: '-10%',
+          width: 500,
+          height: 400,
+          background: 'radial-gradient(ellipse, rgba(168,85,247,0.06) 0%, transparent 70%)',
+          filter: 'blur(60px)',
+        }}
+      />
+      {/* Grid pattern */}
+      <div className="absolute inset-0 bg-grid-subtle opacity-60" />
+    </div>
+  )
+}
+
+// ─── BrandDNA Block ────────────────────────────────────────────────────────────
 
 function BrandDNABlock({ brand }: { brand: Brand }) {
   const dna = brand.brand_dna
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden"
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, rgba(18,18,26,0.95), rgba(26,26,40,0.95)) padding-box, linear-gradient(135deg, rgba(124,58,237,0.5), rgba(168,85,247,0.2), rgba(232,121,249,0.3)) border-box',
+        border: '1px solid transparent',
+        backdropFilter: 'blur(20px)',
+      }}
     >
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-green-500" />
-        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Brand DNA Extracted</span>
+      <div className="px-4 py-3 flex items-center gap-2.5" style={{ borderBottom: '1px solid rgba(124,58,237,0.15)' }}>
+        <div
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ background: '#22c55e', boxShadow: '0 0 8px rgba(34,197,94,0.6)' }}
+        />
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#a78bfa' }}>
+          Brand DNA Extracted
+        </span>
       </div>
       <div className="p-4 space-y-4">
         <div>
-          <p className="text-lg font-700 text-zinc-50">{brand.name}</p>
-          <p className="text-sm text-zinc-400 mt-0.5">{brand.niche}</p>
+          <p className="text-base font-bold text-zinc-50">{brand.name}</p>
+          <p className="text-xs mt-0.5" style={{ color: '#a1a1aa' }}>{brand.niche}</p>
         </div>
 
         {dna?.colors && dna.colors.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Colors</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: '#52525b' }}>Brand Colors</p>
             <div className="flex gap-1.5 flex-wrap">
               {dna.colors.map((c, i) => (
                 <div
                   key={i}
-                  className="w-6 h-6 rounded-full border border-zinc-700"
-                  style={{ background: c }}
+                  className="w-6 h-6 rounded-full"
+                  style={{ background: c, boxShadow: `0 0 10px ${c}40`, border: '1px solid rgba(255,255,255,0.1)' }}
                   title={c}
                 />
               ))}
@@ -86,19 +132,24 @@ function BrandDNABlock({ brand }: { brand: Brand }) {
 
         {dna?.voice_tone && (
           <div>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Voice</p>
-            <p className="text-sm text-zinc-300 italic">"{dna.voice_tone}"</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: '#52525b' }}>Voice</p>
+            <p className="text-sm italic" style={{ color: '#c4b5fd' }}>"{dna.voice_tone}"</p>
           </div>
         )}
 
         {dna?.keywords && dna.keywords.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Keywords</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: '#52525b' }}>Keywords</p>
             <div className="flex flex-wrap gap-1.5">
               {dna.keywords.slice(0, 6).map((kw, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700"
+                  className="text-xs px-2.5 py-1 rounded-full font-medium"
+                  style={{
+                    background: 'rgba(124,58,237,0.12)',
+                    color: '#a78bfa',
+                    border: '1px solid rgba(124,58,237,0.25)',
+                  }}
                 >
                   {kw}
                 </span>
@@ -108,7 +159,7 @@ function BrandDNABlock({ brand }: { brand: Brand }) {
         )}
 
         {dna?.personality && (
-          <p className="text-sm text-zinc-400 leading-relaxed line-clamp-2">{dna.personality}</p>
+          <p className="text-xs leading-relaxed line-clamp-2" style={{ color: '#71717a' }}>{dna.personality}</p>
         )}
       </div>
     </motion.div>
@@ -132,12 +183,17 @@ function PlatformPicker({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden"
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: 'rgba(18,18,26,0.95)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        backdropFilter: 'blur(20px)',
+      }}
     >
-      <div className="px-4 py-3 border-b border-zinc-800">
-        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Choose Platforms</p>
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#71717a' }}>Choose Platforms</p>
       </div>
       <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 gap-2">
@@ -147,18 +203,19 @@ function PlatformPicker({
               <button
                 key={p.id}
                 onClick={() => toggle(p.id)}
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all duration-150 cursor-pointer text-left"
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer text-left"
                 style={{
-                  background: active ? 'rgba(250,250,250,0.06)' : 'transparent',
-                  borderColor: active ? 'rgba(250,250,250,0.2)' : '#27272a',
-                  color: active ? '#f4f4f5' : '#71717a',
+                  background: active ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.02)',
+                  borderColor: active ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${active ? 'rgba(124,58,237,0.35)' : 'rgba(255,255,255,0.06)'}`,
+                  color: active ? '#c4b5fd' : '#52525b',
                 }}
               >
                 <span
                   className={`platform-${p.id} w-3 h-3 rounded-full flex-shrink-0`}
                 />
                 {p.label}
-                {active && <Check size={12} className="ml-auto flex-shrink-0" />}
+                {active && <Check size={11} className="ml-auto flex-shrink-0" style={{ color: '#a78bfa' }} />}
               </button>
             )
           })}
@@ -167,7 +224,7 @@ function PlatformPicker({
         <button
           onClick={onConfirm}
           disabled={selected.length === 0}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           style={{ background: '#fafafa', color: '#09090b' }}
         >
           Continue
@@ -193,17 +250,27 @@ function PostsPicker({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden"
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: 'rgba(18,18,26,0.95)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        backdropFilter: 'blur(20px)',
+      }}
     >
-      <div className="px-4 py-3 border-b border-zinc-800">
-        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Number of Posts</p>
+      <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#71717a' }}>Posts Per Platform</p>
       </div>
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-zinc-400">Posts per platform</span>
-          <span className="text-lg font-700 text-zinc-50">{value}</span>
+          <span className="text-sm" style={{ color: '#a1a1aa' }}>Number of posts</span>
+          <span
+            className="text-2xl font-bold"
+            style={{ color: '#a78bfa', textShadow: '0 0 20px rgba(167,139,250,0.4)' }}
+          >
+            {value}
+          </span>
         </div>
         <input
           type="range"
@@ -211,9 +278,10 @@ function PostsPicker({
           max={10}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full cursor-pointer accent-violet-500"
+          className="w-full cursor-pointer"
+          style={{ accentColor: '#7c3aed' }}
         />
-        <div className="flex justify-between text-xs text-zinc-600">
+        <div className="flex justify-between text-xs" style={{ color: '#3f3f46' }}>
           <span>1</span>
           <span>10</span>
         </div>
@@ -221,8 +289,12 @@ function PostsPicker({
         <button
           onClick={onLaunch}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-          style={{ background: '#fafafa', color: '#09090b' }}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed btn-shine"
+          style={{
+            background: loading ? 'rgba(124,58,237,0.4)' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+            color: '#fff',
+            boxShadow: loading ? 'none' : '0 0 24px rgba(168,85,247,0.4)',
+          }}
         >
           {loading ? (
             <>
@@ -231,8 +303,8 @@ function PostsPicker({
             </>
           ) : (
             <>
+              <Zap size={14} />
               Launch Campaign
-              <ArrowRight size={14} />
             </>
           )}
         </button>
@@ -246,10 +318,13 @@ function PostsPicker({
 function AIAvatar() {
   return (
     <div
-      className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold gradient-text"
-      style={{ background: '#1c1c1f', border: '1px solid #27272a', color: '#e879f9' }}
+      className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center"
+      style={{
+        background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+        boxShadow: '0 0 20px rgba(168,85,247,0.4)',
+      }}
     >
-      B
+      <Sparkles size={13} className="text-white" />
     </div>
   )
 }
@@ -278,14 +353,19 @@ function ChatMessageItem({
   if (message.role === 'ai') {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex items-start gap-3"
       >
         <AIAvatar />
         <div
-          className="px-4 py-2.5 rounded-2xl rounded-tl-sm text-sm leading-relaxed text-zinc-200 max-w-[85%]"
-          style={{ background: '#27272a' }}
+          className="px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]"
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            backdropFilter: 'blur(12px)',
+            color: '#d4d4d8',
+          }}
         >
           {message.content}
         </div>
@@ -296,13 +376,17 @@ function ChatMessageItem({
   if (message.role === 'user') {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex justify-end"
       >
         <div
-          className="px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm leading-relaxed text-zinc-50 max-w-[85%]"
-          style={{ background: '#3f3f46' }}
+          className="px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed max-w-[85%]"
+          style={{
+            background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+            color: '#ede9fe',
+            boxShadow: '0 4px 20px rgba(124,58,237,0.35)',
+          }}
         >
           {message.content}
         </div>
@@ -313,24 +397,30 @@ function ChatMessageItem({
   if (message.role === 'card') {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex items-start gap-3"
       >
         <AIAvatar />
         <div className="flex-1 max-w-[85%]">
           {message.card === 'loading' && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-sm" style={{ background: '#27272a' }}>
+            <div
+              className="flex items-center gap-3 px-4 py-3 rounded-2xl rounded-tl-sm"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
               <motion.div
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ duration: 1.2, repeat: Infinity }}
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 1.4, repeat: Infinity }}
                 className="flex gap-1"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#7c3aed' }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#a855f7' }} />
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#7c3aed' }} />
               </motion.div>
-              <span className="text-xs text-zinc-500">Analyzing your brand...</span>
+              <span className="text-xs" style={{ color: '#71717a' }}>Analyzing your brand...</span>
             </div>
           )}
           {message.card === 'brand-dna' && message.brand && (
@@ -364,8 +454,12 @@ function ChatMessageItem({
 function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
     <div
-      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium"
-      style={{ background: '#27272a', color: '#a1a1aa', border: '1px solid #3f3f46' }}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium"
+      style={{
+        background: 'rgba(124,58,237,0.1)',
+        color: '#a78bfa',
+        border: '1px solid rgba(124,58,237,0.25)',
+      }}
     >
       <span className="max-w-[100px] truncate">{file.name}</span>
       <button onClick={onRemove} className="flex-shrink-0 hover:text-zinc-50 transition-colors cursor-pointer">
@@ -395,7 +489,6 @@ export default function HomePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
@@ -404,7 +497,6 @@ export default function HomePage() {
     scrollToBottom()
   }, [messages, scrollToBottom])
 
-  // Check for existing brands on load
   useEffect(() => {
     getBrands()
       .then((brands) => {
@@ -412,7 +504,6 @@ export default function HomePage() {
           router.replace('/dashboard')
         } else {
           setPageLoading(false)
-          // Show greeting
           setMessages([
             {
               id: 'greeting',
@@ -436,7 +527,6 @@ export default function HomePage() {
       })
   }, [router])
 
-  // Auto-resize textarea
   useEffect(() => {
     const ta = textareaRef.current
     if (!ta) return
@@ -444,7 +534,6 @@ export default function HomePage() {
     ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'
   }, [inputValue])
 
-  // Detect URL in input
   useEffect(() => {
     setDetectedUrl(detectUrl(inputValue))
   }, [inputValue])
@@ -463,7 +552,6 @@ export default function HomePage() {
     const text = inputValue.trim()
     if (!text && files.length === 0) return
 
-    // User message
     let userContent = text
     if (files.length > 0) {
       userContent += userContent ? ` [+ ${files.length} file(s)]` : `[${files.length} file(s) attached]`
@@ -472,7 +560,6 @@ export default function HomePage() {
     setInputValue('')
     setFiles([])
 
-    // Show loading card
     const loadingId = addMessage({ role: 'card', card: 'loading' })
     setPhase('brand-processing')
 
@@ -489,12 +576,9 @@ export default function HomePage() {
 
       const brand = await createBrand(form)
       setCreatedBrand(brand)
-
-      // Replace loading with brand DNA card
       updateMessage(loadingId, { card: 'brand-dna', brand })
       setPhase('brand-confirmed')
 
-      // AI follow-up
       setTimeout(() => {
         addMessage({
           role: 'ai',
@@ -603,33 +687,104 @@ export default function HomePage() {
 
   if (pageLoading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
-        <div className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-200 animate-spin" />
+      <div className="fixed inset-0 flex flex-col items-center justify-center" style={{ background: '#0a0a0f' }}>
+        <div
+          className="absolute"
+          style={{
+            top: '30%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 600,
+            height: 400,
+            background: 'radial-gradient(ellipse, rgba(124,58,237,0.15) 0%, transparent 70%)',
+            filter: 'blur(60px)',
+          }}
+        />
+        <div className="relative flex flex-col items-center gap-4">
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center float"
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              boxShadow: '0 0 40px rgba(168,85,247,0.5)',
+            }}
+          >
+            <Sparkles size={20} className="text-white" />
+          </div>
+          <div
+            className="w-5 h-5 rounded-full border-2 animate-spin"
+            style={{ borderColor: '#3730a3', borderTopColor: '#a855f7' }}
+          />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950">
+    <div className="flex flex-col h-screen relative" style={{ background: '#0a0a0f' }}>
+      <AtmosphericBackground />
+
       {/* Header */}
-      <div className="flex-shrink-0 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+      <div
+        className="flex-shrink-0 z-10 relative px-6 py-4 flex items-center justify-between"
+        style={{
+          background: 'rgba(10,10,15,0.85)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
         <div className="flex items-center gap-3">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
-            style={{ background: '#1c1c1f', border: '1px solid #27272a', color: '#e879f9' }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              boxShadow: '0 0 20px rgba(168,85,247,0.4)',
+            }}
           >
-            B
+            <Sparkles size={15} className="text-white" />
           </div>
           <div>
-            <h1 className="text-sm font-700 gradient-text leading-none">Britney</h1>
-            <p className="text-xs text-zinc-500 mt-0.5">AI Marketing Agent</p>
+            <h1 className="text-sm font-bold gradient-text leading-none">Britney</h1>
+            <p className="text-[11px] mt-0.5" style={{ color: '#52525b' }}>AI Marketing Agent</p>
           </div>
+        </div>
+        <div
+          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-medium"
+          style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', color: '#a78bfa' }}
+        >
+          <div className="relative">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#22c55e' }} />
+            <div className="absolute inset-0 w-1.5 h-1.5 rounded-full ping-slow" style={{ background: '#22c55e' }} />
+          </div>
+          Ready
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+      <div className="flex-1 overflow-y-auto relative z-10">
+        <div className="max-w-2xl mx-auto px-4 py-8 space-y-5">
+          {messages.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="text-center pt-16 pb-8"
+            >
+              <div
+                className="w-16 h-16 rounded-3xl mx-auto mb-6 flex items-center justify-center float"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                  boxShadow: '0 0 60px rgba(168,85,247,0.5)',
+                }}
+              >
+                <Sparkles size={28} className="text-white" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2 gradient-text">Meet Britney</h2>
+              <p className="text-sm" style={{ color: '#71717a' }}>
+                Your AI-powered marketing agent. Let's build your brand.
+              </p>
+            </motion.div>
+          )}
+
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
               <ChatMessageItem
@@ -653,10 +808,15 @@ export default function HomePage() {
       <AnimatePresence>
         {showInput && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="flex-shrink-0 border-t border-zinc-800 px-4 py-4"
+            exit={{ opacity: 0, y: 12 }}
+            className="flex-shrink-0 relative z-10 px-4 py-4"
+            style={{
+              background: 'rgba(10,10,15,0.9)',
+              backdropFilter: 'blur(20px)',
+              borderTop: '1px solid rgba(255,255,255,0.05)',
+            }}
           >
             <div className="max-w-2xl mx-auto space-y-2">
               {/* File chips */}
@@ -675,26 +835,42 @@ export default function HomePage() {
               {/* URL preview */}
               {detectedUrl && (
                 <div
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-                  style={{ background: '#27272a', border: '1px solid #3f3f46' }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+                  style={{
+                    background: 'rgba(124,58,237,0.08)',
+                    border: '1px solid rgba(124,58,237,0.2)',
+                  }}
                 >
-                  <Globe size={12} className="text-zinc-500 flex-shrink-0" />
-                  <span className="text-zinc-400 truncate">{detectedUrl}</span>
-                  <span className="text-zinc-600 flex-shrink-0">will be scraped</span>
+                  <Globe size={11} style={{ color: '#a78bfa' }} className="flex-shrink-0" />
+                  <span className="truncate" style={{ color: '#a78bfa' }}>{detectedUrl}</span>
+                  <span className="flex-shrink-0" style={{ color: '#52525b' }}>will be scraped</span>
                 </div>
               )}
 
               {/* Input row */}
               <div
-                className="flex items-end gap-2 rounded-xl px-3 py-2"
-                style={{ background: '#27272a', border: '1px solid #3f3f46' }}
+                className="flex items-end gap-2 rounded-2xl px-3 py-2.5 transition-all duration-200"
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  backdropFilter: 'blur(20px)',
+                }}
               >
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex-shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700 transition-colors cursor-pointer"
+                  className="flex-shrink-0 p-2 rounded-xl transition-all duration-200 cursor-pointer"
+                  style={{ color: '#52525b' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#a78bfa'
+                    e.currentTarget.style.background = 'rgba(124,58,237,0.1)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#52525b'
+                    e.currentTarget.style.background = 'transparent'
+                  }}
                   title="Attach files"
                 >
-                  <Paperclip size={16} />
+                  <Paperclip size={15} />
                 </button>
 
                 <textarea
@@ -707,17 +883,21 @@ export default function HomePage() {
                       ? 'Describe your brand, paste a URL, or just say what you do...'
                       : 'e.g. Drive awareness for our new product launch...'
                   }
-                  className="flex-1 bg-transparent resize-none outline-none text-sm text-zinc-100 placeholder-zinc-600 min-h-[24px] max-h-[120px]"
+                  className="flex-1 bg-transparent resize-none outline-none text-sm min-h-[24px] max-h-[120px]"
+                  style={{ color: '#f4f4f5' }}
                   rows={1}
                 />
 
                 <button
                   onClick={handleSend}
                   disabled={!canSend}
-                  className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{ background: canSend ? '#fafafa' : 'transparent' }}
+                  className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{
+                    background: canSend ? 'linear-gradient(135deg, #7c3aed, #a855f7)' : 'rgba(255,255,255,0.04)',
+                    boxShadow: canSend ? '0 0 20px rgba(168,85,247,0.4)' : 'none',
+                  }}
                 >
-                  <Send size={14} style={{ color: canSend ? '#09090b' : '#52525b' }} />
+                  <Send size={13} style={{ color: canSend ? '#fff' : '#3f3f46' }} />
                 </button>
               </div>
 
