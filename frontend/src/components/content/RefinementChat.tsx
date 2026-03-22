@@ -139,7 +139,6 @@ export default function RefinementChat({ post, onClose, onPostUpdate }: Refineme
             const parsed = JSON.parse(data) as {
               type?: string
               content?: string
-              post?: Post
             }
 
             if (parsed.type === 'state') {
@@ -155,7 +154,7 @@ export default function RefinementChat({ post, onClose, onPostUpdate }: Refineme
                     : m,
                 ),
               )
-            } else if (parsed.type === 'text' || parsed.content) {
+            } else if (parsed.type === 'text') {
               const chunk = parsed.content ?? ''
               fullContent += chunk
               setMessages((prev) =>
@@ -163,8 +162,13 @@ export default function RefinementChat({ post, onClose, onPostUpdate }: Refineme
                   m.id === assistantId ? { ...m, content: fullContent, state: 'done' } : m,
                 ),
               )
-            } else if (parsed.post) {
-              onPostUpdate(parsed.post)
+            } else if (parsed.type === 'post_update' && parsed.content) {
+              try {
+                const { post: updatedPost } = JSON.parse(parsed.content) as { post: Post }
+                if (updatedPost) onPostUpdate(updatedPost)
+              } catch {
+                // ignore
+              }
             }
           } catch {
             // Ignore parse errors for partial chunks

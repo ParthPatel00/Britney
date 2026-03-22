@@ -25,12 +25,16 @@ async def create_campaign(req: CampaignCreateRequest, db: Session = Depends(get_
     )
     db.add(campaign)
     db.commit()
+    db.refresh(campaign)
     return {
         "id": campaign.id,
         "brand_id": campaign.brand_id,
+        "goal": campaign.goal,
         "status": campaign.status,
         "platforms": req.platforms,
-        "num_posts": req.num_posts,
+        "num_posts": campaign.num_posts,
+        "created_at": campaign.created_at.isoformat(),
+        "updated_at": campaign.created_at.isoformat(),
     }
 
 
@@ -86,6 +90,7 @@ async def get_campaign(campaign_id: str, db: Session = Depends(get_db)):
             "post_briefs": json.loads(strategy.post_briefs_json or "[]"),
         } if strategy else None,
         "created_at": campaign.created_at.isoformat(),
+        "updated_at": campaign.created_at.isoformat(),
     }
 
 
@@ -101,8 +106,10 @@ async def list_campaigns(brand_id: str = None, db: Session = Depends(get_db)):
             "brand_id": c.brand_id,
             "goal": c.goal,
             "status": c.status,
+            "platforms": json.loads(c.platforms_json or "[]"),
             "num_posts": c.num_posts,
             "created_at": c.created_at.isoformat(),
+            "updated_at": c.created_at.isoformat(),
         }
         for c in campaigns
     ]

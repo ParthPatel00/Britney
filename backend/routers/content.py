@@ -41,7 +41,8 @@ async def select_variant(post_id: str, req: SelectVariantRequest, db: Session = 
         raise HTTPException(404, "Variant not found")
     post.selected_variant_id = req.variant_id
     db.commit()
-    return {"ok": True, "selected_variant_id": req.variant_id}
+    db.refresh(post)
+    return _serialize_post(post, db)
 
 
 @router.post("/{post_id}/approve")
@@ -51,7 +52,8 @@ async def approve_post(post_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Post not found")
     post.status = "approved"
     db.commit()
-    return {"ok": True}
+    db.refresh(post)
+    return _serialize_post(post, db)
 
 
 @router.post("/{post_id}/reject")
@@ -61,7 +63,8 @@ async def reject_post(post_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Post not found")
     post.status = "rejected"
     db.commit()
-    return {"ok": True}
+    db.refresh(post)
+    return _serialize_post(post, db)
 
 
 @router.post("/{post_id}/refine")
@@ -86,7 +89,7 @@ async def refine_post(post_id: str, req: RefineRequest, db: Session = Depends(ge
     dna = json.loads(brand.dna_json or "{}") if brand else {}
 
     async def generate():
-        yield _sse("Analyzing your request...", "log")
+        yield _sse("analyzing", "state")
 
         # Ask Gemini what needs changing
         plan_prompt = f"""
@@ -115,23 +118,19 @@ If user says 'fix typo', only needs_new_caption=true.
         except Exception:
             plan = {"needs_new_image": False, "needs_new_caption": True, "new_caption": variant.caption}
 
-        yield _sse(f"Plan: {plan.get('explanation', 'Updating content...')}", "log")
-
         new_image_path = None
         new_caption = variant.caption
 
         if plan.get("needs_new_caption") and plan.get("new_caption"):
             new_caption = plan["new_caption"]
-            yield _sse("Caption updated", "log")
+            yield _sse("caption", "state")
 
         if plan.get("needs_new_image") and plan.get("new_image_prompt"):
-            yield _sse("Regenerating image with FLUX...", "log")
+            yield _sse("image", "state")
             new_image_path = await replicate_flux.generate_image(
                 plan["new_image_prompt"],
                 filename_prefix=f"refined_{post.platform}"
             )
-            if new_image_path:
-                yield _sse("New image generated!", "log")
 
         # Save changes
         history = json.loads(variant.refinement_history_json or "[]")
@@ -145,7 +144,8 @@ If user says 'fix typo', only needs_new_caption=true.
         db2 = SessionLocal()
         try:
             v = db2.query(PostVariant).filter(PostVariant.id == variant.id).first()
-            if v:
+            p = db2.query(Post).filter(Post.id == post_id).first()
+            if v and p:
                 v.caption = new_caption
                 v.refinement_history_json = json.dumps(history)
 
@@ -160,16 +160,13 @@ If user says 'fix typo', only needs_new_caption=true.
                     v.image_generation_prompt = plan.get("new_image_prompt", v.image_generation_prompt)
 
                 db2.commit()
-                db2.refresh(v)
+                db2.refresh(p)
 
-                # Return updated variant
-                updated = {
-                    "id": v.id,
-                    "label": v.label,
-                    "caption": v.caption,
-                    "media_assets": json.loads(v.media_assets_json or "[]"),
-                }
-                yield _sse(json.dumps(updated), "complete")
+                # Send explanation as text, then updated post
+                explanation = plan.get("explanation", "Post updated successfully!")
+                yield _sse(explanation, "text")
+                updated_post = _serialize_post(p, db2)
+                yield _sse(json.dumps({"post": updated_post}), "post_update")
         finally:
             db2.close()
 
@@ -199,33 +196,45 @@ async def serve_media(filename: str):
     raise HTTPException(404, "Media not found")
 
 
-def _sse(data: str, event_type: str = "log") -> str:
-    return f"data: {json.dumps({'type': event_type, 'message': data})}\n\n".encode()
+def _sse(content: str, event_type: str = "text") -> bytes:
+    return f"data: {json.dumps({'type': event_type, 'content': content})}\n\n".encode()
 
 
 def _serialize_post(post: Post, db: Session) -> dict:
     variants = db.query(PostVariant).filter(PostVariant.post_id == post.id).all()
+    selected_id = post.selected_variant_id or (variants[0].id if variants else None)
     return {
         "id": post.id,
         "campaign_id": post.campaign_id,
         "platform": post.platform,
         "status": post.status,
-        "selected_variant_id": post.selected_variant_id,
+        "selected_variant_id": selected_id,
         "scheduled_at": post.scheduled_at.isoformat() if post.scheduled_at else None,
-        "published_at": post.published_at.isoformat() if post.published_at else None,
-        "publish_results": json.loads(post.publish_results_json or "{}"),
+        "published_url": None,
         "created_at": post.created_at.isoformat(),
-        "variants": [_serialize_variant(v) for v in variants],
+        "updated_at": post.created_at.isoformat(),
+        "variants": [_serialize_variant(v, v.id == selected_id) for v in variants],
     }
 
 
-def _serialize_variant(v: PostVariant) -> dict:
+def _serialize_variant(v: PostVariant, selected: bool = False) -> dict:
+    assets = json.loads(v.media_assets_json or "[]")
+    # Find first image asset and map to MediaAsset shape
+    media = None
+    for asset in assets:
+        if asset.get("type") in ("image", "video"):
+            filename = asset.get("file_path", "").split("/")[-1]
+            media = {
+                "id": v.id,
+                "filename": filename,
+                "url": asset.get("url", f"/api/media/{filename}"),
+                "type": asset.get("type", "image"),
+            }
+            break
     return {
         "id": v.id,
         "label": v.label,
         "caption": v.caption,
-        "platform_captions": json.loads(v.platform_captions_json or "{}"),
-        "media_assets": json.loads(v.media_assets_json or "[]"),
-        "refinement_history": json.loads(v.refinement_history_json or "[]"),
-        "created_at": v.created_at.isoformat(),
+        "media": media,
+        "selected": selected,
     }

@@ -96,8 +96,10 @@ async def setup_brand(
         "name": brand.name,
         "description": brand.description,
         "niche": brand.niche,
-        "dna": dna.model_dump(),
+        "website_url": brand.website_url,
+        "brand_dna": dna.model_dump(),
         "created_at": brand.created_at.isoformat(),
+        "updated_at": brand.created_at.isoformat(),
     }
 
 
@@ -114,9 +116,10 @@ async def get_brand(brand_id: str, db: Session = Depends(get_db)):
         "description": brand.description,
         "niche": brand.niche,
         "website_url": brand.website_url,
-        "dna": dna,
+        "brand_dna": dna,
         "autopilot": autopilot,
         "created_at": brand.created_at.isoformat(),
+        "updated_at": brand.created_at.isoformat(),
     }
 
 
@@ -129,9 +132,12 @@ async def list_brands(db: Session = Depends(get_db)):
         result.append({
             "id": brand.id,
             "name": brand.name,
+            "description": brand.description,
             "niche": brand.niche,
-            "dna": dna,
+            "website_url": brand.website_url,
+            "brand_dna": dna,
             "created_at": brand.created_at.isoformat(),
+            "updated_at": brand.created_at.isoformat(),
         })
     return result
 

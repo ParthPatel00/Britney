@@ -27,25 +27,21 @@ async def get_trends(brand_id: str, db: Session = Depends(get_db)):
     )
 
     if not trends:
-        # No fresh trends - return empty, frontend will trigger a new campaign
-        return {"trends": [], "stale": True}
+        return []
 
-    return {
-        "trends": [
-            {
-                "id": t.id,
-                "topic": t.topic,
-                "score": t.score,
-                "category": t.category,
-                "summary": t.summary,
-                "source_urls": json.loads(t.source_urls_json or "[]"),
-                "hijack_idea": t.hijack_content_idea,
-                "fetched_at": t.fetched_at.isoformat() if t.fetched_at else None,
-            }
-            for t in trends
-        ],
-        "stale": False,
-    }
+    return [
+        {
+            "id": t.id,
+            "brand_id": t.brand_id,
+            "topic": t.topic,
+            "score": t.score,
+            "category": t.category,
+            "summary": t.summary,
+            "hijack_idea": t.hijack_content_idea,
+            "created_at": t.fetched_at.isoformat() if t.fetched_at else None,
+        }
+        for t in trends
+    ]
 
 
 @router.post("/hijack")
@@ -78,8 +74,18 @@ async def hijack_trend(
     db.add(campaign)
     db.commit()
 
+    db.refresh(campaign)
     background_tasks.add_task(_run_hijack_pipeline, campaign.id, trend_id)
-    return {"campaign_id": campaign.id, "status": "started"}
+    return {
+        "id": campaign.id,
+        "brand_id": campaign.brand_id,
+        "goal": campaign.goal,
+        "status": campaign.status,
+        "platforms": ["instagram", "twitter"],
+        "num_posts": campaign.num_posts,
+        "created_at": campaign.created_at.isoformat(),
+        "updated_at": campaign.created_at.isoformat(),
+    }
 
 
 async def _run_hijack_pipeline(campaign_id: str, trend_id: str):

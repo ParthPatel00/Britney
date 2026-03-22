@@ -19,20 +19,23 @@ import type { Platform } from '../lib/types'
 
 // ─── Particle Background ──────────────────────────────────────────────────────
 
-function ParticleBackground() {
-  const particles = Array.from({ length: 40 }).map((_, i) => ({
-    id: i,
-    size: Math.random() * 4 + 1,
-    color: i % 3 === 0 ? '#7c3aed' : i % 3 === 1 ? '#a855f7' : '#4f46e5',
-    left: `${Math.random() * 100}%`,
-    top: `${Math.random() * 100}%`,
-    duration: Math.random() * 20 + 15,
-    delay: Math.random() * 10,
-  }))
+// Pre-computed stable particles to avoid SSR hydration mismatch
+const PARTICLES = Array.from({ length: 40 }).map((_, i) => {
+  // Deterministic pseudo-random using index
+  const seed = (i * 2654435761) >>> 0
+  const size = 1 + (seed % 400) / 100
+  const left = (seed % 10000) / 100
+  const top = ((seed >> 8) % 10000) / 100
+  const duration = 15 + (seed % 2000) / 100
+  const delay = (seed % 1000) / 100
+  const color = i % 3 === 0 ? '#7c3aed' : i % 3 === 1 ? '#a855f7' : '#4f46e5'
+  return { id: i, size, color, left: `${left}%`, top: `${top}%`, duration, delay }
+})
 
+function ParticleBackground() {
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden>
-      {particles.map((p) => (
+      {PARTICLES.map((p) => (
         <div
           key={p.id}
           className="absolute rounded-full opacity-0"

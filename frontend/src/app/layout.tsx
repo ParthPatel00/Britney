@@ -21,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${plusJakartaSans.variable}`}>
-      <body className="min-h-screen antialiased" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <body suppressHydrationWarning className="min-h-screen antialiased" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         {children}
         <Toaster
           position="bottom-right"
